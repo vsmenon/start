@@ -25,18 +25,20 @@ Installation
 
 2.  Unzip and add the dart-sdk/bin directory to your path.
 
-3.  Download Start from https://github.com/vsmenon/start.  You can either:
-(a)   Use git (recommended): git clone https://github.com/vsmenon/start.git
-(b)   Download a tarball: https://github.com/vsmenon/start/archive/master.zip
+3.  Download Start from https://github.com/vsmenon/start.  You can either use git (recommended):
+  
+    > git clone https://github.com/vsmenon/start.git
+  
+    Or, download a tarball: https://github.com/vsmenon/start/archive/master.zip
 
 4.  Navigate to the project:
-  > cd start
+    > cd start
 
 5.  Install dependencies:
-  > pub install
+    > pub install
 
-6.  Run correctness tests:
-  > dart bin/test.dart
+6.  Run correctness tests to ensure everything is working:
+    > dart bin/test.dart
 
 7.  Run performance tests:
-  > dart bin/time.dart
+    > dart bin/time.dart
