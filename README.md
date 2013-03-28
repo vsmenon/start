@@ -1,3 +1,6 @@
+Start
+===================
+
 Start is a simple 'toy' programming language for investigating different aspects of compiler implementation and optimization.
 
 Start is based upon a subset of the Dart programming language, an optionally typed C-style programming language.  This includes:
@@ -14,3 +17,26 @@ Although many Start programs run identically in Dart, Start differs in important
 
 The start compiler translates source programs into a bytecode-like intermediate representation.  The start
 interpreter executes the bytecode-like representation.
+
+Installation
+------------
+
+1.  Download the Dart SDK from here: http://www.dartlang.org/downloads.html
+
+2.  Unzip and add the dart-sdk/bin directory to your path.
+
+3.  Download Start from https://github.com/vsmenon/start.  You can either:
+(a)   Use git (recommended): git clone https://github.com/vsmenon/start.git
+(b)   Download a tarball: https://github.com/vsmenon/start/archive/master.zip
+
+4.  Navigate to the project:
+  > cd start
+
+5.  Install dependencies:
+  > pub install
+
+6.  Run correctness tests:
+  > dart bin/test.dart
+
+7.  Run performance tests:
+  > dart bin/time.dart
