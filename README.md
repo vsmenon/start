@@ -57,3 +57,12 @@ To save the intermediate code to file, run:
 
 Finally, to run intermediate code:
   > dart bin/start.dart -r link.start
+
+Acknowledgements
+----------------
+
+The Start compiler and intermediate representation are based upon the csc educational compiler developed
+by [Martin Burtscher](http://cs.txstate.edu/~mb92/) at UT Austin and used in Prof. Keshav Pingali's
+[graduate compiler course](http://www.cs.utexas.edu/users/pingali/CS380C/2007fa/index.html) there.
+
+
