@@ -42,3 +42,18 @@ Installation
 
 7.  Run performance tests:
     > dart bin/time.dart
+
+Compile and Run
+---------------
+
+You can execute a Start program from source as follows:
+  > dart bin/start.dart examples/link.dart
+
+To compile without running, use the `-c` flag:
+  > dart bin/start.dart -c examples/link.dart
+
+To save the intermediate code to file, run:
+  > dart bin/start.dart -c examples/link.dart > link.start
+
+Finally, to run intermediate code:
+  > dart bin/start.dart -r link.start
