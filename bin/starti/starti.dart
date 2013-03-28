@@ -105,106 +105,106 @@ int _parse(String bytecode, List<Instruction> instructions) {
 
 class Memory {
   // The "machine" word size.
-  static const slotsize = 8;
+  static const WORD_SIZE = 8;
 
   // Amount of global space in bytes and longs.
-  static const gsize = 32768;
-  static const glongsize = gsize ~/ slotsize;
+  static const GLOBAL_DATA_SIZE = 32768;
+  static const GLOBAL_DATA_WORD_SIZE = GLOBAL_DATA_SIZE ~/ WORD_SIZE;
 
   // Amount of stack space in bytes and longs.
-  static const ssize = 65536;
-  static const slongsize = ssize ~/ slotsize;
+  static const STACK_SIZE = 65536;
+  static const STACK_WORD_SIZE = STACK_SIZE ~/ WORD_SIZE;
 
   // Amount of heap space in bytes and longs.
-  static const hsize = 1048576;
-  static const hlongsize = hsize ~/ slotsize;
+  static const HEAP_SIZE = 1048576;
+  static const HEAP_WORD_SIZE = HEAP_SIZE ~/ WORD_SIZE;
 
-  static const longsize = glongsize + slongsize + hlongsize;
-  static const bytesize = longsize * slotsize;
+  static const MEMORY_WORD_SIZE = GLOBAL_DATA_WORD_SIZE + STACK_WORD_SIZE
+      + HEAP_WORD_SIZE;
+  static const MEMORY_SIZE = MEMORY_WORD_SIZE * WORD_SIZE;
 
   // Flat memory of long values with globals followed by stack
-  final memory = new List.filled(longsize, 0);
+  final _memory = new List.filled(MEMORY_WORD_SIZE, 0);
 
   Memory() {
-    _check(gsize % slotsize == 0,
-        "Global memory must evenly divide into slots");
-    _check(ssize % slotsize == 0,
-        "Stack must evenly divide into slots");
-    _check(hsize % slotsize == 0,
-        "Heap must evenly divide into slots");
+    _check(GLOBAL_DATA_SIZE % WORD_SIZE == 0,
+        "Global memory must evenly divide into words");
+    _check(STACK_SIZE % WORD_SIZE == 0,
+        "Stack must evenly divide into words");
+    _check(HEAP_SIZE % WORD_SIZE == 0,
+        "Heap must evenly divide into words");
     fp = gp;
     sp = fp;
-    hp = ssize + gsize;
-    allocated = 0;
+    hp = STACK_SIZE + GLOBAL_DATA_SIZE;
+    _allocatedBytes = 0;
   }
 
-  int _address2slot(addr) => (addr~/slotsize);
-  int _slot2address(slot) => (slot*slotsize);
+  int _address2slot(addr) {
+    _check(addr % WORD_SIZE == 0, "Unaligned load");
+    return addr~/WORD_SIZE;
+  }
+  int _slot2address(slot) => (slot*WORD_SIZE);
 
-  int load(int addr) => memory[_address2slot(addr)];
+  // Load the value at the given address.
+  int load(int addr) => _memory[_address2slot(addr)];
+
+  // Store the value to the given address.
   void store(int addr, int value) {
-    memory[_address2slot(addr)] = value;
+    _memory[_address2slot(addr)] = value;
   }
 
-  const gp = ssize;
-  int fp;
-  int sp;
-  int hp;
-  int allocated;
+  // Global data pointer.
+  const gp = STACK_SIZE;
 
-  int malloc(int bytes) {
-    _check(bytes > 0 && bytes % slotsize == 0, "Malloc request must divide into slots");
+  // Stack frame pointer.
+  int fp;
+
+  // Stack pointer.
+  int sp;
+
+  // Heap pointer.
+  int hp;
+  int _allocatedBytes;
+
+  // Allocate an object of the given [size] in bytes on the heap.
+  int malloc(int size) {
+    _check(size > 0 && size % WORD_SIZE == 0,
+        "Malloc request must divide into words");
     int chunk = hp;
-    hp = hp + bytes;
+    hp = hp + size;
     // Check if we're out of memory.
-    if (hp >= bytesize) return 0;
-    allocated += bytes;
+    if (hp >= MEMORY_SIZE) return 0;
+    _allocatedBytes += size;
     return chunk;
   }
 
+  // Push a value on the stack.
   void push(int value) {
-    sp -= slotsize;
-    memory[_address2slot(sp)] = value;
+    sp -= WORD_SIZE;
+    store(sp, value);
   }
 
+  // Pop a value from the stack.
   int pop() {
-    final result = memory[_address2slot(sp)];
-    memory[_address2slot(sp)] = 0;
-    sp += slotsize;
+    final result = load(sp);
+    // Clear out the old stack slot to catch errors.
+    store(sp, 0);
+    sp += WORD_SIZE;
     return result;
   }
 
-  void pushN(int newSlots) {
-    sp -= newSlots * slotsize;
+  // Push [n] zero values onto the stack.
+  void pushN(int n) {
+    sp -= n * WORD_SIZE;
   }
 
-  void popN(int oldSlots) {
-    for (int i = 0; i < oldSlots; ++i)
+  // Pop [n] values from the stack and discard.
+  void popN(int n) {
+    for (int i = 0; i < n; ++i)
       pop();
   }
 
-  void printGlobals() {
-    final map = new Map<int, int>();
-    final first = _address2slot(gp);
-    for (int i = first; i < first + glongsize; ++i) {
-      if (memory[i] != 0) {
-        map[_slot2address(i)] = memory[i];
-      }
-    }
-    print("Globals: $map");
-  }
-
-  void printHeap() {
-    final map = new Map<int, int>();
-    final first = _address2slot(gp) + glongsize;
-    for (int i = first; i < _address2slot(hp); ++i) {
-      if (memory[i] != 0) {
-        map[_slot2address(i)] = memory[i];
-      }
-    }
-    print("Heap: $map");
-  }
-
+  // Validate the state of memory.
   bool validate() {
     if (sp <= 0) {
       print("StackOverflowError");
@@ -219,11 +219,33 @@ class Memory {
     return true;
   }
 
-  void dump() {
-    printGlobals();
-    printHeap();
-    print("Stack: ${memory.sublist(_address2slot(sp),
+  void _debug() {
+    _debugGlobals();
+    _debugHeap();
+    print("Stack: ${_memory.sublist(_address2slot(sp),
         _address2slot(gp))}");
+  }
+
+  void _debugGlobals() {
+    final map = new Map<int, int>();
+    final first = _address2slot(gp);
+    for (int i = first; i < first + GLOBAL_DATA_WORD_SIZE; ++i) {
+      if (_memory[i] != 0) {
+        map[_slot2address(i)] = _memory[i];
+      }
+    }
+    print("Globals: $map");
+  }
+
+  void _debugHeap() {
+    final map = new Map<int, int>();
+    final first = _address2slot(gp) + GLOBAL_DATA_WORD_SIZE;
+    for (int i = first; i < _address2slot(hp); ++i) {
+      if (_memory[i] != 0) {
+        map[_slot2address(i)] = _memory[i];
+      }
+    }
+    print("Heap: $map");
   }
 }
 
@@ -249,6 +271,28 @@ class RegisterStack {
   }
 }
 
+int resolveOperand(Memory memory, RegisterStack reg, String arg) {
+  if (arg == "GP")
+    return memory.gp;
+  else if (arg == "FP")
+    return memory.fp;
+  else if ((arg.indexOf("_base#") > 0)
+      || (arg.indexOf("_offset#") > 0)
+      || (arg.indexOf("_type#") > 0))
+    return int.parse(arg.split("#")[1]);
+  else if (arg.indexOf("#") > 0) {
+    final offset = int.parse(arg.split("#")[1]);
+    //return offset;
+    // TODO(vsm): Delete this and clean up base above.
+    return memory.load(memory.fp+offset);
+  } else if (arg[0] == "(")
+    return reg[int.parse(arg.slice(1,-1))];
+  else if (arg[0] == "[")
+    return int.parse(arg.slice(1,-1));
+  else
+    return int.parse(arg);
+}
+
 String execute(String bytecode, { bool debug: false }) {
   // Instructions indexed by pc-1
   final instructions = [];
@@ -265,27 +309,7 @@ String execute(String bytecode, { bool debug: false }) {
   var pc = entrypc;
 
   // Resolve operand
-  int op(String arg) {
-    if (arg == "GP")
-      return memory.gp;
-    else if (arg == "FP")
-      return memory.fp;
-    else if ((arg.indexOf("_base#") > 0)
-          || (arg.indexOf("_offset#") > 0)
-          || (arg.indexOf("_type#") > 0))
-      return int.parse(arg.split("#")[1]);
-    else if (arg.indexOf("#") > 0) {
-      final offset = int.parse(arg.split("#")[1]);
-      //return offset;
-      // TODO(vsm): Delete this and clean up base above.
-      return memory.load(memory.fp+offset);
-    } else if (arg[0] == "(")
-      return reg[int.parse(arg.slice(1,-1))];
-    else if (arg[0] == "[")
-      return int.parse(arg.slice(1,-1));
-    else
-      return int.parse(arg);
-  };
+  int op(String arg) => resolveOperand(memory, reg, arg);
 
   // Set operand to val
   void set(String lvalue, int val) {
@@ -347,7 +371,7 @@ String execute(String bytecode, { bool debug: false }) {
     if (!memory.validate()) break;
 
     if (debug) {
-      memory.dump();
+      memory._debug();
       print("\nExecuting ($pc, ${memory.fp}, ${memory.sp}): $opc $args");
     }
 
@@ -552,7 +576,7 @@ String execute(String bytecode, { bool debug: false }) {
       // New register window
       reg.push();
       // Allocate locals
-      memory.pushN(op(args[0]) ~/ Memory.slotsize);
+      memory.pushN(op(args[0]) ~/ Memory.WORD_SIZE);
     }
     else if (opc == "ret") {
       // Pop locals
@@ -583,7 +607,7 @@ String execute(String bytecode, { bool debug: false }) {
 - Instruction count : $instructionCount
 - Instruction cache misses : $icacheMisses
 - Branch mispredicts : $branchMispredicts
-- Allocated bytes: ${memory.allocated}
+- Allocated bytes: ${memory._allocatedBytes}
 """;
   return stats;
 }
