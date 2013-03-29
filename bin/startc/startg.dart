@@ -106,6 +106,7 @@ const iwrl = const Opcode._('wrl');
 
 // Memory allocation.
 const inew = const Opcode._('new');
+const inewlist = const Opcode._('newlist');
 const ibox = const Opcode._('box');
 const iunbox = const Opcode._('unbox');
 
@@ -674,7 +675,6 @@ void decode()
       case icmplt:
       case istore:
       case imove:
-      case inew:
       case icheckbounds:
       case ichecktype:
       case ilddynamic:
@@ -692,6 +692,8 @@ void decode()
       case icall:
       case iwrite:
       case ichecknull:
+      case inew:
+      case inewlist:
       case ibox:
       case iunbox:
         printNode(i.x);

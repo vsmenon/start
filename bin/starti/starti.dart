@@ -271,26 +271,27 @@ class RegisterStack {
   }
 }
 
-int resolveOperand(Memory memory, RegisterStack reg, String arg) {
-  if (arg == "GP")
+// Resolve the value of the operand string from input.
+int resolveOperand(Memory memory, RegisterStack reg, String operand) {
+  if (operand == "GP")
     return memory.gp;
-  else if (arg == "FP")
+  else if (operand == "FP")
     return memory.fp;
-  else if ((arg.indexOf("_base#") > 0)
-      || (arg.indexOf("_offset#") > 0)
-      || (arg.indexOf("_type#") > 0))
-    return int.parse(arg.split("#")[1]);
-  else if (arg.indexOf("#") > 0) {
-    final offset = int.parse(arg.split("#")[1]);
+  else if ((operand.indexOf("_base#") > 0)
+      || (operand.indexOf("_offset#") > 0)
+      || (operand.indexOf("_type#") > 0))
+    return int.parse(operand.split("#")[1]);
+  else if (operand.indexOf("#") > 0) {
+    final offset = int.parse(operand.split("#")[1]);
     //return offset;
     // TODO(vsm): Delete this and clean up base above.
     return memory.load(memory.fp+offset);
-  } else if (arg[0] == "(")
-    return reg[int.parse(arg.slice(1,-1))];
-  else if (arg[0] == "[")
-    return int.parse(arg.slice(1,-1));
+  } else if (operand[0] == "(")
+    return reg[int.parse(operand.slice(1,-1))];
+  else if (operand[0] == "[")
+    return int.parse(operand.slice(1,-1));
   else
-    return int.parse(arg);
+    return int.parse(operand);
 }
 
 String execute(String bytecode, { bool debug: false }) {
@@ -308,7 +309,7 @@ String execute(String bytecode, { bool debug: false }) {
   // Initial pc
   var pc = entrypc;
 
-  // Resolve operand
+  // Convenience wrapper to resolve operand string.
   int op(String arg) => resolveOperand(memory, reg, arg);
 
   // Set operand to val
@@ -506,32 +507,18 @@ String execute(String bytecode, { bool debug: false }) {
       memory.push(op(args[0]));
     }
     else if (opc == "new") {
-      final typename = args[0].split("_type")[0];
-      // TODO(vsm): Install vtable.
-      // TODO(vsm): Replace with newlist.
-      if (typename.startsWith('List')) {
-        final length = op(args[1]);
-        final list = memory.malloc(16+8*length);
-        if (list == 0) {
-          print("OutOfMemoryError");
-          break;
-        }
-        reg[pc] = list;
-        memory.store(list, listtype.id);
-        memory.store(list+8, length);
-      } else {
-        final type = Type.typeMap[typename];
-        _check(type.size == op(args[0]),
+      final typename = args[0].split("_type#")[0];
+      final type = Type.typeMap[typename];
+      _check(type.size == op(args[0]),
             "Incorrect size ${op(args[0])} for ${type.name} (expected ${type.size})");
-        final obj = memory.malloc(type.size);
-        if (obj == 0) {
-          print("OutOfMemoryError");
-          break;
-        }
-
-        memory.store(obj, type.id);
-        reg[pc] = obj;
+      final obj = memory.malloc(type.size);
+      if (obj == 0) {
+        print("OutOfMemoryError");
+        break;
       }
+
+      memory.store(obj, type.id);
+      reg[pc] = obj;
     }
     else if (opc == "newlist") {
       final length = op(args[0]);

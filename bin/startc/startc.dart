@@ -119,29 +119,24 @@ Node factor(Node x)
       var ctr = findObj(globalScope, currentAsString);
       if (ctr == null || ctr.kind != KIND_TYPE)
         error("Badly formed constructor $currentAsString");
-      var size = new Node();
+
       token = nextToken();
-      // TODO(vsm): Cleanup.
-      if (ctr.type == listType && token == TOKEN_LSS) {
-        token = nextToken();
-        assert(token == TOKEN_IDENT && currentAsString == "int");
-        token = nextToken();
-        assert(token == TOKEN_GTR);
-        token = nextToken();
-      }
       if (token != TOKEN_LPAREN) error("'(' expected");
       token = nextToken();
       if (ctr.type == listType) {
         // Argument expected.
+        var size = new Node();
         size = expression(size);
-        size = unbox(size);
+        size = load(unbox(size));
+        x = putOpNode(inewlist, size, ctr.type);
       } else {
+        var size = new Node();
         makeConstNodeDesc(size, intType, ctr.type.size);
+        size = load(size);
+        x = putOpNodeNode(inew, ctr, size, ctr.type);
       }
       if (token != TOKEN_RPAREN) error("')' expected");
       token = nextToken();
-      size = load(size);
-      x = putOpNodeNode(inew, ctr, size, ctr.type);
       break;
     case TOKEN_IDENT:
       obj = findObj(globalScope, currentAsString);
