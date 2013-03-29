@@ -81,6 +81,7 @@ const imod = const Opcode._('mod');
 const icmpeq = const Opcode._('cmpeq');
 const icmplt = const Opcode._('cmplt');
 const icmple = const Opcode._('cmple');
+const iisnull = const Opcode._('isnull');
 
 // Function call opcodes.
 const inop = const Opcode._('nop');
@@ -426,16 +427,25 @@ Node relation(Token op, Node x, Node y)
 {
   Node t;
 
-  if (op != TOKEN_EQL) {
-    x = unbox(x);
-    y = unbox(y);
-  } else {
-    // TODO(vsm): Implement iisnull.
-    if (!isNull(x) && !isNull(y)) {
-      x = unbox(x);
-      y = unbox(y);
+  if (op == TOKEN_EQL) {
+    // isnull
+    var ref = null;
+    if (isNull(x)) {
+      ref = box(y);
+    } else if(isNull(y)) {
+      ref = box(x);
+    }
+    if (ref != null) {
+      t = putOpNode(iisnull, ref, boolType);
+      x = putOpNode(iblbc, t, null);
+      x.jmpFalse = null;
+      x.jmpTrue = pc.prv;
+      return x;
     }
   }
+
+  x = unbox(x);
+  y = unbox(y);
 
   switch (op) {
     case TOKEN_EQL:
@@ -685,6 +695,7 @@ void decode()
 
       // Unary operations
       case ineg:
+      case iisnull:
       case iload:
       case iparam:
       case ienter:

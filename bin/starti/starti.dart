@@ -396,6 +396,8 @@ String execute(String bytecode, { bool debug: false }) {
       reg[pc] = (op(args[0]) <= op(args[1])) ? 1 : 0;
     else if (opc == "cmplt")
       reg[pc] = (op(args[0]) < op(args[1])) ? 1 : 0;
+    else if (opc == "isnull")
+      reg[pc] = (op(args[0]) == 0) ? 1 : 0;
     else if (opc == "br")
       pc = op(args[0]) - 1;
     else if (opc == "blbc")
