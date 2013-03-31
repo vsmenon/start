@@ -262,8 +262,9 @@ void fieldList(TypeDesc type)
 }
 
 
-TypeDesc classType(TypeDesc type)
+TypeDesc classType()
 {
+  TypeDesc type;
   Node obj;
   int oldinstruct;
   String id;
@@ -699,7 +700,7 @@ void program()
   instruction = 0;
   while ((token != TOKEN_VOID) && (token != TOKEN_EOF)) {
     if (token == TOKEN_CLASS) {
-      classType(null);
+      classType();
     } else {
       globalScope = variableDeclaration(globalScope);
     }

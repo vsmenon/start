@@ -780,6 +780,7 @@ void initialParser()
   listType = new TypeDesc('List');
   listType.form = FORM_LIST;
   listType.size = 8;
+  listType.base = dynamicType;
 
   gp = new Node();
   intType.form = FORM_INTEGER;
