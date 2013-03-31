@@ -1,4 +1,5 @@
 //test array and struct
+
 import 'stdio.dart';
 
 class A {
