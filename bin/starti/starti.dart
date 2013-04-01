@@ -1,5 +1,7 @@
 library starti;
 
+import 'dart:typeddata';
+
 // The machine word size.  This must match the value in startc.
 const WORD_SIZE = 4;
 
@@ -123,8 +125,8 @@ class Memory {
       + HEAP_WORD_SIZE;
   static const MEMORY_SIZE = MEMORY_WORD_SIZE * WORD_SIZE;
 
-  // Flat memory of long values with globals followed by stack
-  final _memory = new List.filled(MEMORY_WORD_SIZE, 0);
+  // Flat memory of values with globals followed by stack
+  final _memory = new Int32List(MEMORY_WORD_SIZE);
 
   Memory() {
     _check(GLOBAL_DATA_SIZE % WORD_SIZE == 0,
