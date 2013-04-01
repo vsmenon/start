@@ -1,7 +1,7 @@
 library starti;
 
 // The machine word size.  This must match the value in startc.
-const WORD_SIZE = 8;
+const WORD_SIZE = 4;
 
 final _bufferedPrint = () {
   var _buffer = new StringBuffer();

@@ -3,8 +3,8 @@ library startc;
 part 'startg.dart';
 part 'starts.dart';
 
-// The machine word size.  This must match the value in startc.
-const WORD_SIZE = 8;
+// The machine word size.  This must match the value in starti.
+const WORD_SIZE = 4;
 
 final _buffer = new StringBuffer();
 
