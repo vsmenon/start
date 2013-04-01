@@ -60,6 +60,17 @@ To save the intermediate code to file, run:
 Finally, to run intermediate code:
   > dart bin/start.dart -r link.start
 
+Performance metrics
+-------------------
+
+The Start interpreter provides performance metrics that model a very simple execution machine.  To print these after
+execution, use the _-p_ flag.  For example, the following shows the performance of both the typed and untyped version
+of _link.dart_:
+
+  > dart bin/start.dart -p examples/link.dart
+  
+  > dart bin/start.dart -p untyped/link.dart
+
 Acknowledgements
 ----------------
 
