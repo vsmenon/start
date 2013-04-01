@@ -3,7 +3,7 @@ Start
 
 Start is a simple 'toy' programming language for investigating different aspects of compiler implementation and optimization.
 
-Start is based upon a subset of the Dart programming language, an optionally typed C-style programming language.  This includes:
+Start is based upon a subset of the [Dart programming language](http://www.dartlang.org), an optionally typed C-style programming language.  This includes:
 
 - top-level methods
 - basic types: int, bool, List, dynamic
