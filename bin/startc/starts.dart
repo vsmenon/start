@@ -168,6 +168,12 @@ Token nextToken()
         sym = TOKEN_MOD;
         _ch = getc(_script);
         break;
+      case '~':
+        _ch = getc(_script);
+        if (_ch != _int('/')) error("illegal symbol encountered");
+        sym = TOKEN_DIV;
+        _ch = getc(_script);
+        break;
       case '/':
         sym = TOKEN_DIV;
         _ch = getc(_script);

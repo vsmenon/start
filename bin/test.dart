@@ -19,9 +19,9 @@ final TESTS = [
                 ];
 
 Future<List<String>> run(String vm, String interp, String dir, String test) {
-  final dart = Process.run(vm, ['$dir/$test'])
+  final dart = Process.run(vm, ['--checked', '$dir/$test'])
       .then((r) => r.stdout);
-  final start = Process.run(vm, [interp, '$dir/$test'])
+  final start = Process.run(vm, ['--checked', interp, '$dir/$test'])
       .then((r) => r.exitCode != 0
         ? fail('$test failed on:\n${r.stderr}')
         : r.stdout);

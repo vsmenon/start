@@ -28,7 +28,7 @@ int findTime(String output) {
   }
 }
 
-Future<List<String>> time(String vm, String interp, String dir,
+Future<int> time(String vm, String interp, String dir,
                          String test) {
   final out = Process.run(vm, [interp, '--stats',
                                      '$dir/$test'])

@@ -71,7 +71,7 @@ void main()
   m = m * 256 + 255;
   m = m * 256 + 255;
   m = m * 256 + 255;
-  q = m / a;
+  q = m ~/ a;
   r = m % a;
   Factorial(7);
   WriteLong(res);

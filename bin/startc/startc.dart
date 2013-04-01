@@ -130,10 +130,7 @@ Node factor(Node x)
         size = load(unbox(size));
         x = putOpNode(inewlist, size, ctr.type);
       } else {
-        var size = new Node();
-        makeConstNodeDesc(size, intType, ctr.type.size);
-        size = load(size);
-        x = putOpNodeNode(inew, ctr, size, ctr.type);
+        x = putOpNode(inew, ctr, ctr.type);
       }
       if (token != TOKEN_RPAREN) error("')' expected");
       token = nextToken();
