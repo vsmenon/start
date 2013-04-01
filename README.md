@@ -11,7 +11,7 @@ Start is based upon a subset of the Dart programming language, an optionally typ
 - classes and heap-allocated objects
 - static and dynamic typing
 
-Start omits many features of Dart: it doesn't have inheritance, virtual methods, closures, libraries, and some control flow features (switches, for-loops).  It doesn't support any of Dart's libraries.
+Start omits many features of Dart: it doesn't have inheritance, virtual methods, closures, libraries, and some control flow features (exceptions, switches, for-loops).  It doesn't support any of Dart's libraries.
 
 Although many Start programs run identically in Dart, Start differs in important ways.  The int type is 64-bit and non-nullable in Start but infinite precision and nullable in Dart.  The bool type is non-nullable in Start but nullable in Dart.
 
