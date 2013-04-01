@@ -18,7 +18,7 @@ ArgResults options() {
   parser.addFlag('help', abbr: 'h', help: 'Show usage', defaultsTo: false);
   parser.addFlag('run', abbr: 'r', help: 'Run from IR', defaultsTo: false);
   parser.addFlag('show', help: 'Print IR', defaultsTo: false);
-  parser.addFlag('stats', help: 'Show stats', defaultsTo: false);
+  parser.addFlag('stats', abbr: 'p', help: 'Show stats', defaultsTo: false);
   return parser.parse(argv);
 }
 
