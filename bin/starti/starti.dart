@@ -1,5 +1,8 @@
 library starti;
 
+// The machine word size.  This must match the value in startc.
+const WORD_SIZE = 8;
+
 final _bufferedPrint = () {
   var _buffer = new StringBuffer();
   return (message) {
@@ -74,7 +77,7 @@ class Type {
     }
   }
 
-  int get size => fieldMap.length * 8 + 8;
+  int get size => fieldMap.length * WORD_SIZE + WORD_SIZE;
 }
 
 int _parse(String bytecode, List<Instruction> instructions) {
@@ -104,9 +107,6 @@ int _parse(String bytecode, List<Instruction> instructions) {
 }
 
 class Memory {
-  // The "machine" word size.
-  static const WORD_SIZE = 8;
-
   // Amount of global space in bytes and longs.
   static const GLOBAL_DATA_SIZE = 32768;
   static const GLOBAL_DATA_WORD_SIZE = GLOBAL_DATA_SIZE ~/ WORD_SIZE;
@@ -298,8 +298,8 @@ String execute(String bytecode, { bool debug: false }) {
   // Builtin types.
   final inttype = new Type("int", []);
   final booltype = new Type("bool", []);
-  final listtype = new Type("List", ["length#8:int"]);
-  final boxedIntType = new Type("Integer", ["value#8:int"]);
+  final listtype = new Type("List", ["length#$WORD_SIZE:int"]);
+  final boxedIntType = new Type("Integer", ["value#$WORD_SIZE:int"]);
 
   // Instructions indexed by pc-1
   final instructions = [];
@@ -440,13 +440,13 @@ String execute(String bytecode, { bool debug: false }) {
       if (fieldTypeName == inttype.name) {
         // Auto-box.
         // TODO(vsm): Factor out.
-        final boxed = memory.malloc(16);
+        final boxed = memory.malloc(WORD_SIZE*2);
         if (boxed == 0) {
           print("OutOfMemoryError");
           break;
         }
         memory.store(boxed, boxedIntType.id);
-        memory.store(boxed+8, value);
+        memory.store(boxed+WORD_SIZE, value);
         reg[pc] = boxed;
       } else {
         // Already a boxed type.
@@ -468,19 +468,19 @@ String execute(String bytecode, { bool debug: false }) {
       final fieldTypeName = dynamicType.fieldTypes[fieldname];
       if (fieldTypeName == inttype.name) {
         _check(memory.load(value) == boxedIntType.id, "Invalid boxed int");
-        value = memory.load(value+8);
+        value = memory.load(value+WORD_SIZE);
       }
       memory.store(ref+offset, value);
     }
     else if (opc == "box") {
       final value = op(args[0]);
-      final boxed = memory.malloc(16);
+      final boxed = memory.malloc(WORD_SIZE*2);
       if (boxed == 0) {
         print("OutOfMemoryError");
         break;
       }
       memory.store(boxed, boxedIntType.id);
-      memory.store(boxed+8, value);
+      memory.store(boxed+WORD_SIZE, value);
       reg[pc] = boxed;
     }
     else if (opc == "unbox") {
@@ -490,7 +490,7 @@ String execute(String bytecode, { bool debug: false }) {
         print("UnboxError");
         break;
       }
-      reg[pc] = memory.load(ref+8);
+      reg[pc] = memory.load(ref+WORD_SIZE);
     }
     else if (opc == "move") {
       if (debug)
@@ -526,14 +526,14 @@ String execute(String bytecode, { bool debug: false }) {
     }
     else if (opc == "newlist") {
       final length = op(args[0]);
-      final list = memory.malloc(16+8*length);
+      final list = memory.malloc(WORD_SIZE*2+WORD_SIZE*length);
       if (list == 0) {
         print("OutOfMemoryError");
         break;
       }
       reg[pc] = list;
       memory.store(list, listtype.id);
-      memory.store(list+8, length);
+      memory.store(list+WORD_SIZE, length);
     }
     else if (opc == "checknull") {
       final ref = op(args[0]);
@@ -546,7 +546,7 @@ String execute(String bytecode, { bool debug: false }) {
     else if (opc == "checkbounds") {
       final list = op(args[0]);
       final index = op(args[1]);
-      final length = memory.load(list+8);
+      final length = memory.load(list+WORD_SIZE);
       if (index < 0 || length <= index) {
         print('RangeError');
         break;
@@ -567,7 +567,7 @@ String execute(String bytecode, { bool debug: false }) {
       // New register window
       reg.push();
       // Allocate locals
-      memory.pushN(op(args[0]) ~/ Memory.WORD_SIZE);
+      memory.pushN(op(args[0]) ~/ WORD_SIZE);
     }
     else if (opc == "ret") {
       // Pop locals

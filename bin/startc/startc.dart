@@ -3,6 +3,9 @@ library startc;
 part 'startg.dart';
 part 'starts.dart';
 
+// The machine word size.  This must match the value in startc.
+const WORD_SIZE = 8;
+
 final _buffer = new StringBuffer();
 
 void printf(message) {
@@ -286,8 +289,8 @@ TypeDesc classType()
     oldinstruct = instruction;
     instruction = 1;
     obj = addToList(globalScope, id);
-    // TODO(vsm): Abstract 8 to addr size.
-    initObject(obj, KIND_TYPE, null, type, 8);
+    // TODO(vsm): Abstract WORD_SIZE to addr size.
+    initObject(obj, KIND_TYPE, null, type, WORD_SIZE);
 
     fieldList(type);
     instruction = oldinstruct;
@@ -610,7 +613,7 @@ void formalParameters(Node root)
   Node curr;
   int paddr;
 
-  paddr = 16;
+  paddr = WORD_SIZE*2;
   paddr = formalParameter(root, paddr);
   while (token == TOKEN_COMMA) {
     token = nextToken();
@@ -664,7 +667,7 @@ Node procedureBody(Node proc)
   returnsize = 0;
   curr = proc.dsc;
   while ((curr != null) && (curr.dsc == proc)) {
-    returnsize += 8;
+    returnsize += WORD_SIZE;
     curr = curr.next;
   }
   statementSequence();
@@ -785,10 +788,10 @@ String compile(String input)
 {
   initializeParser();
   globalScope = null;
-  globalScope = insertObj(globalScope, KIND_TYPE, intType, "int", 8);
-  globalScope = insertObj(globalScope, KIND_TYPE, boxedIntType, "Integer", 8);
-  globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", 16);
-  globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "dynamic", 8);
+  globalScope = insertObj(globalScope, KIND_TYPE, intType, "int", WORD_SIZE);
+  globalScope = insertObj(globalScope, KIND_TYPE, boxedIntType, "Integer", WORD_SIZE);
+  globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", WORD_SIZE*2);
+  globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "dynamic", WORD_SIZE);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLong", 2);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLine", 3);
 

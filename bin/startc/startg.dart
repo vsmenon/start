@@ -265,7 +265,7 @@ Node checkType(Node x, TypeDesc t) {
   if(x.type == t)
     return x;
   Node type = new Node();
-  initObject(type, KIND_TYPE, null, t, 8);
+  initObject(type, KIND_TYPE, null, t, WORD_SIZE);
   x = putOpNodeNode(ichecktype, x, type, t);
   return x;
 }
@@ -773,11 +773,11 @@ void initializeParser()
 
   intType = new TypeDesc('int');
   intType.form = FORM_INTEGER;
-  intType.size = 8;
+  intType.size = WORD_SIZE;
 
   boxedIntType = new TypeDesc('Integer');
   boxedIntType.form = FORM_CLASS;
-  boxedIntType.size = 16;
+  boxedIntType.size = WORD_SIZE*2;
   boxedIntType.fields = new Node();
   boxedIntType.fields.name = "value";
   boxedIntType.fields.type = intType;
@@ -786,15 +786,15 @@ void initializeParser()
 
   boolType = new TypeDesc('bool');
   boolType.form = FORM_BOOLEAN;
-  boolType.size = 8;
+  boolType.size = WORD_SIZE;
 
   dynamicType = new TypeDesc('dynamic');
   dynamicType.form = FORM_INTEGER;
-  dynamicType.size = 8;
+  dynamicType.size = WORD_SIZE;
 
   listType = new TypeDesc('List');
   listType.form = FORM_LIST;
-  listType.size = 8;
+  listType.size = WORD_SIZE;
   listType.base = dynamicType;
   listType.fields = new Node();
   listType.fields.name = "length";
@@ -804,9 +804,9 @@ void initializeParser()
 
   gp = new Node();
   intType.form = FORM_INTEGER;
-  intType.size = 8;
+  intType.size = WORD_SIZE;
 
   fp = new Node();
   intType.form = FORM_INTEGER;
-  intType.size = 8;
+  intType.size = WORD_SIZE;
 }
