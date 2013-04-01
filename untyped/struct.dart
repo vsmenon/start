@@ -2,26 +2,26 @@
 import 'stdio.dart';
 
 class B {
-  dynamic q;
-  dynamic r;
-  dynamic s;
+  var q;
+  var r;
+  var s;
 }
 
 class A {
-  dynamic x;
-  dynamic y;
-  dynamic z;
+  var x;
+  var y;
+  var z;
 }
 
-dynamic a;
+var a;
 
-dynamic b;
+var b;
 
 void main()
 {
-  dynamic i;
-  dynamic c;
-  dynamic qq;
+  var i;
+  var c;
+  var qq;
 
   a = new A();
   a.z = new B();

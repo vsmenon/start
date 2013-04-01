@@ -1,12 +1,12 @@
 //test multiple control flow
 import 'stdio.dart';
 
-dynamic m;
-dynamic n;
+var m;
+var n;
 
-dynamic tmp;
-void alloc(dynamic m, dynamic n) {
-  dynamic i;
+var tmp;
+void alloc(var m, var n) {
+  var i;
   tmp = new List(m);
   i = 0;
   while (i < m) {
@@ -17,11 +17,11 @@ void alloc(dynamic m, dynamic n) {
 
 void main()
 {
-  dynamic m1;
-  dynamic m2;
-  dynamic m3;
+  var m1;
+  var m2;
+  var m3;
 
-  dynamic i, j, k;
+  var i, j, k;
 
   m = 4;
   n = 3;

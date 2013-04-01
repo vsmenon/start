@@ -1,12 +1,12 @@
 //test recursive function calls
 import 'stdio.dart';
 
-dynamic a, m, q, r;
-dynamic count;
-dynamic res;
+var a, m, q, r;
+var count;
+var res;
 
 
-void Factorial(dynamic n)
+void Factorial(var n)
 {
   if (n == 0) {
     res = 1;
@@ -17,9 +17,9 @@ void Factorial(dynamic n)
 }
 
 
-void FibRec(dynamic n)
+void FibRec(var n)
 {
-  dynamic x, y;
+  var x, y;
 
   if (n <= 1) {
     res = 1;
@@ -33,7 +33,7 @@ void FibRec(dynamic n)
 }
 
 
-void MoveDisc(dynamic from, dynamic to)
+void MoveDisc(var from, var to)
 {
   WriteLong(from);
   WriteLong(to);
@@ -42,7 +42,7 @@ void MoveDisc(dynamic from, dynamic to)
 }
 
 
-void MoveTower(dynamic from, dynamic by, dynamic to, dynamic height)
+void MoveTower(var from, var by, var to, var height)
 {
   if (height == 1) {
     MoveDisc(from, to);
@@ -54,7 +54,7 @@ void MoveTower(dynamic from, dynamic by, dynamic to, dynamic height)
 }
 
 
-void Hanoi(dynamic height)
+void Hanoi(var height)
 {
   count = 0;
   MoveTower(1, 2, 3, height);

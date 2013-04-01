@@ -6,11 +6,11 @@ import 'stdio.dart';
  * Method for finding out prime numbers.
  */
 
-dynamic n;
+var n;
 
 void main() {
-    dynamic i;
-    dynamic j;
+    var i;
+    var j;
     List is_prime;
     n = 1000;
     is_prime = new List(n);

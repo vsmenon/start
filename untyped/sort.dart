@@ -1,13 +1,13 @@
 //test array and while sentence
 import 'stdio.dart';
 
-dynamic n;
+var n;
 
 void main() {
 
-    dynamic i;
-    dynamic j;
-    dynamic temp;
+    var i;
+    var j;
+    var temp;
     List array;
 
     n = 10;
@@ -31,7 +31,7 @@ void main() {
         j = 0;
         while (j < i) {
             if (array[j] > array[i]) {
-                temp = array[i]; 
+                temp = array[i];
                 array[i] = array[j];
                 array[j] = temp;
             }

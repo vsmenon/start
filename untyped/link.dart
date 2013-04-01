@@ -2,15 +2,15 @@
 import 'stdio.dart';
 
 class A {
-  dynamic value;
-  dynamic next;
+  var value;
+  var next;
 }
 
-dynamic tmp;
-dynamic total;
+var tmp;
+var total;
 
-void init(dynamic count) {
-  dynamic a;
+void init(var count) {
+  var a;
   if (count <= 0) {
     tmp = null;
   } else {
@@ -22,7 +22,7 @@ void init(dynamic count) {
   }
 }
 
-void sum(dynamic a) {
+void sum(var a) {
   if (a == null) {
     total = 0;
   } else {
@@ -33,8 +33,8 @@ void sum(dynamic a) {
 
 void main()
 {
-  dynamic a;
-  
+  var a;
+
   init(10);
   a = tmp;
   sum(a);

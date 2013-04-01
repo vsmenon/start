@@ -792,6 +792,7 @@ String compile(String input)
   globalScope = insertObj(globalScope, KIND_TYPE, boxedIntType, "Integer", WORD_SIZE);
   globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", WORD_SIZE*2);
   globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "dynamic", WORD_SIZE);
+  globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "var", WORD_SIZE);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLong", 2);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLine", 3);
 

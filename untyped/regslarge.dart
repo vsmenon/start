@@ -3,7 +3,7 @@ import 'stdio.dart';
 
 void main()
 {
-  dynamic a, b, c;
+  var a, b, c;
 
   a = 1;
   b = 2;

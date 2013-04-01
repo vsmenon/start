@@ -1,13 +1,13 @@
 //test multiple function calls
 import 'stdio.dart';
 
-dynamic a, b;
-dynamic res;
+var a, b;
+var res;
 
 
-void GCD(dynamic a, dynamic b)
+void GCD(var a, var b)
 {
-  dynamic c;
+  var c;
 
   while (b != 0) {
     c = a;

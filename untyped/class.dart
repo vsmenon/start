@@ -2,36 +2,36 @@
 import 'stdio.dart';
 
 class A {
-  dynamic x;
-  dynamic y;
+  var x;
+  var y;
 }
 
 class B {
-  dynamic y;
-  dynamic a;
+  var y;
+  var a;
 }
 
 class C {
-  dynamic y;
+  var y;
 }
 
-dynamic b;
+var b;
 
-void init1(dynamic a, dynamic b) {
+void init1(var a, var b) {
   b.a = a;
   a.x = 19;
 }
 
-void init2(dynamic c) {
+void init2(var c) {
   c.y = 23;
   b = c;
 }
 
 void main()
 {
-  dynamic a;
-  dynamic b2;
-  dynamic c;
+  var a;
+  var b2;
+  var c;
 
   a = new A();
   b = null;

@@ -15,14 +15,14 @@ class C {
   A y;
 }
 
-dynamic b;
+var b;
 
 void init1(A a, B b) {
   b.a = a;
   a.x = 19;
 }
 
-void init2(dynamic c) {
+void init2(var c) {
   c.y = 23;
   b = c;
 }

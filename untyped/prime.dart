@@ -5,7 +5,7 @@ List prime;
 
 void main()
 {
-  dynamic i, j, v;
+  var i, j, v;
 
   prime = new List(400);
 

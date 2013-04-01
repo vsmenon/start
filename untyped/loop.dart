@@ -3,8 +3,8 @@ import 'stdio.dart';
 
 void main()
 {
-  dynamic a, b, c, d, e, f;
-  dynamic n, x;
+  var a, b, c, d, e, f;
+  var n, x;
 
   n = 13;
   x = 0;
