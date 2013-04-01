@@ -13,10 +13,12 @@ Start is based upon a subset of the Dart programming language, an optionally typ
 
 Start omits many features of Dart: it doesn't have inheritance, virtual methods, closures, libraries, and some control flow features (exceptions, switches, for-loops).  It doesn't support any of Dart's libraries.
 
-Although many Start programs run identically in Dart, Start differs in important ways.  The int type is 64-bit and non-nullable in Start but infinite precision and nullable in Dart.  The bool type is non-nullable in Start but nullable in Dart.
+Although many Start programs run identically in Dart, Start differs in important ways.  The int type is 32-bit and non-nullable in Start but infinite precision and nullable in Dart.  The bool type is non-nullable in Start but nullable in Dart.
 
 The start compiler translates source programs into a bytecode-like intermediate representation.  The start
 interpreter executes the bytecode-like representation.
+
+See the [Start Language and Intermediate Form Overview](https://github.com/vsmenon/start/wiki/Language-and-IR-Overview) for more details.
 
 Installation
 ------------
