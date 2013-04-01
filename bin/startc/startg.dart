@@ -59,7 +59,7 @@ class Node {
   Node original;  // Pointer to original node object if a copy was made
 }
 
-TypeDesc intType, boolType, dynamicType, listType;
+TypeDesc intType, boolType, dynamicType, listType, boxedIntType;
 int currentLevel = 0;
 Node pc;
 
@@ -235,7 +235,12 @@ Node dynamicAddr(Node ref, Node field) {
 Node unbox(Node x) {
   if (x.type == intType) return x; // Already unboxed;
   if (x.type == dynamicType) {
-    return putOpNode(iunbox, x, intType);
+    final checked = checkNull(x);
+    final boxed = checkType(checked, boxedIntType);
+    final ctr = findObj(globalScope, "Integer");
+    final field = findObj(ctr.type.fields, "value");
+    final addr = fieldAddress(boxed, field, false);
+    return load(addr);
   }
   error("Cannot unbox non-int type");
 }
@@ -248,7 +253,12 @@ Node box(Node x) {
     error("Cannot box bool type");
   }
   if (x.type == intType) {
-    return putOpNode(ibox, x, dynamicType);
+    final ctr = findObj(globalScope, "Integer");
+    final boxed = putOpNode(inew, ctr, boxedIntType);
+    final field = findObj(ctr.type.fields, "value");
+    final addr = fieldAddress(boxed, field, false);
+    store(addr, x);
+    return boxed;
   }
   return x;
 }
@@ -286,7 +296,7 @@ Node load(Node x) {
   return x;
 }
 
-Node fieldAddress(Node x, Node y) { /* x = x.y */
+Node fieldAddress(Node x, Node y, bool testNull) { /* x = x.y */
   if (x.kind == KIND_VAR) {
     if (x.lev == 0) {
       final type = x.type;
@@ -294,7 +304,7 @@ Node fieldAddress(Node x, Node y) { /* x = x.y */
       x = putOpNode(iload, x, type);
     }
   }
-  x = checkNull(x);
+  if (testNull) x = checkNull(x);
   if (y.type == dynamicType) {
     x = dynamicAddr(x, y);
   } else {
@@ -768,6 +778,15 @@ void initializeParser()
   intType = new TypeDesc('int');
   intType.form = FORM_INTEGER;
   intType.size = 8;
+
+  boxedIntType = new TypeDesc('Integer');
+  boxedIntType.form = FORM_CLASS;
+  boxedIntType.size = 16;
+  boxedIntType.fields = new Node();
+  boxedIntType.fields.name = "value";
+  boxedIntType.fields.type = intType;
+  boxedIntType.fields.kind = KIND_FLD;
+  boxedIntType.fields.val = intType.size;
 
   boolType = new TypeDesc('bool');
   boolType.form = FORM_BOOLEAN;

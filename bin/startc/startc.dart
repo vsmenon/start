@@ -379,12 +379,12 @@ Node designatorM(Node x)
         obj = findObj(x.type.fields, currentAsString);
         token = nextToken();
         if (obj == null) error("unknown identifier");
-        x = fieldAddress(x, obj);
+        x = fieldAddress(x, obj, true);
       } else {
         Node dyn = new Node();
         makeDynamicNodeDesc(dyn, currentAsString);
         token = nextToken();
-        x = fieldAddress(x, dyn);
+        x = fieldAddress(x, dyn, true);
       }
     } else {
       token = nextToken();
@@ -743,7 +743,7 @@ Node insertObj(Node root, Kind clss, TypeDesc type, String name, int val)
 void printTypes() {
   for(var sym = globalScope; sym != null; sym = sym.next) {
     if (sym.kind == KIND_TYPE) {
-      if (sym.type.form == FORM_CLASS) {
+      if (sym.type.form == FORM_CLASS && sym.type != boxedIntType) {
         printf("    type ${sym.name}:");
         for (var field = sym.type.fields; field != null;
             field = field.next) {
@@ -786,7 +786,8 @@ String compile(String input)
   initializeParser();
   globalScope = null;
   globalScope = insertObj(globalScope, KIND_TYPE, intType, "int", 8);
-  globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", 8);
+  globalScope = insertObj(globalScope, KIND_TYPE, boxedIntType, "Integer", 8);
+  globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", 16);
   globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "dynamic", 8);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLong", 2);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLine", 3);

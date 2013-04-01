@@ -295,13 +295,15 @@ int resolveOperand(Memory memory, RegisterStack reg, String operand) {
 }
 
 String execute(String bytecode, { bool debug: false }) {
+  // Builtin types.
+  final inttype = new Type("int", []);
+  final booltype = new Type("bool", []);
+  final listtype = new Type("List", ["length#8:int"]);
+  final boxedIntType = new Type("Integer", ["value#8:int"]);
+
   // Instructions indexed by pc-1
   final instructions = [];
   final entrypc = _parse(bytecode, instructions);
-
-  final inttype = new Type("int", []);
-  final booltype = new Type("bool", []);
-  final listtype = new Type("List", []);
 
   final memory = new Memory();
   final reg = new RegisterStack();
@@ -443,7 +445,7 @@ String execute(String bytecode, { bool debug: false }) {
           print("OutOfMemoryError");
           break;
         }
-        memory.store(boxed, inttype.id);
+        memory.store(boxed, boxedIntType.id);
         memory.store(boxed+8, value);
         reg[pc] = boxed;
       } else {
@@ -465,7 +467,7 @@ String execute(String bytecode, { bool debug: false }) {
       // Auto-unbox int values based on static type.
       final fieldTypeName = dynamicType.fieldTypes[fieldname];
       if (fieldTypeName == inttype.name) {
-        _check(memory.load(value) == inttype.id, "Invalid boxed int");
+        _check(memory.load(value) == boxedIntType.id, "Invalid boxed int");
         value = memory.load(value+8);
       }
       memory.store(ref+offset, value);
@@ -477,14 +479,14 @@ String execute(String bytecode, { bool debug: false }) {
         print("OutOfMemoryError");
         break;
       }
-      memory.store(boxed, inttype.id);
+      memory.store(boxed, boxedIntType.id);
       memory.store(boxed+8, value);
       reg[pc] = boxed;
     }
     else if (opc == "unbox") {
       final ref = op(args[0]);
       final reftypeid = memory.load(ref);
-      if (reftypeid != inttype.id) {
+      if (reftypeid != boxedIntType.id) {
         print("UnboxError");
         break;
       }
@@ -586,7 +588,7 @@ String execute(String bytecode, { bool debug: false }) {
       pc = pc;
     else
       _check(false, "Unknown opcode $opc");
-    if (debug)
+    if (debug && reg._current != null)
       print("reg[$pc] == ${reg[pc]}");
     pc = pc + 1;
   }
