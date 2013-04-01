@@ -108,8 +108,6 @@ const iwrl = const Opcode._('wrl');
 // Memory allocation.
 const inew = const Opcode._('new');
 const inewlist = const Opcode._('newlist');
-const ibox = const Opcode._('box');
-const iunbox = const Opcode._('unbox');
 
 // Safety check opcodes.
 const ichecknull = const Opcode._('checknull');
@@ -715,8 +713,6 @@ void decode()
       case ichecknull:
       case inew:
       case inewlist:
-      case ibox:
-      case iunbox:
         printNode(i.x);
         assert(i.y == null);
         assert(i.z == null);
