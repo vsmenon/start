@@ -755,7 +755,7 @@ void decode()
 }
 
 
-void initialParser()
+void initializeParser()
 {
   entrypc = null;
 
@@ -781,6 +781,11 @@ void initialParser()
   listType.form = FORM_LIST;
   listType.size = 8;
   listType.base = dynamicType;
+  listType.fields = new Node();
+  listType.fields.name = "length";
+  listType.fields.type = intType;
+  listType.fields.kind = KIND_FLD;
+  listType.fields.val = intType.size;
 
   gp = new Node();
   intType.form = FORM_INTEGER;

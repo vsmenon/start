@@ -783,7 +783,7 @@ void printMethods() {
 
 String compile(String input)
 {
-  initialParser();
+  initializeParser();
   globalScope = null;
   globalScope = insertObj(globalScope, KIND_TYPE, intType, "int", 8);
   globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", 8);
