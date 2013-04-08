@@ -42,6 +42,10 @@ void main()
 
   WriteLong(b2.a.y + b.y + b2.a.x - 23);
   WriteLine();
+  if (b is B) {
+    WriteLong(b.y);
+    WriteLine();
+  }
 }
 
 /*

@@ -12,6 +12,7 @@ final TESTS = [
                 'link.dart',
                 'mmm.dart',
                 'prime.dart',
+                'rational.dart',
                 'regslarge.dart',
                 'sieve.dart',
                 'sort.dart',

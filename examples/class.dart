@@ -42,6 +42,12 @@ void main()
 
   WriteLong(b2.a.y + b.y + b2.a.x - 23);
   WriteLine();
+  if (42 is int) {
+    WriteLong(b.y);
+    WriteLine();
+  }
+  WriteLong(7);
+  WriteLine();
 }
 
 /*

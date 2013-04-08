@@ -216,6 +216,14 @@ Node equalityExpr(Node x)
     token = nextToken();
     y = simpleExpression(y);
     x = relation(op, x, y);
+  } else if (token == TOKEN_IS || token == TOKEN_ISNOT) {
+    op = token;
+    token = nextToken();
+    y = findObj(globalScope, currentAsString);
+    if (y == null || y.kind != KIND_TYPE)
+      error("Invalid type $currentAsString");
+    x = istype(op, x, y);
+    token = nextToken();
   }
   return x;
 }

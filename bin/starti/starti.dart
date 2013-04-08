@@ -37,6 +37,9 @@ int cost(String opc) {
     "stdynamic": 100,
     "box": 12,
     "unbox": 3,
+    "istype": 2,
+    "checktype": 2,
+    "checkbounds": 3,
   };
   if (costMap.containsKey(opc)) {
     return costMap[opc];
@@ -302,6 +305,7 @@ String execute(String bytecode, { bool debug: false }) {
   final booltype = new Type("bool", []);
   final listtype = new Type("List", ["length#$WORD_SIZE:int"]);
   final boxedIntType = new Type("Integer", ["value#$WORD_SIZE:int"]);
+  final dynamicType = new Type("dynamic", []);
 
   // Instructions indexed by pc-1
   final instructions = [];
@@ -402,6 +406,19 @@ String execute(String bytecode, { bool debug: false }) {
       reg[pc] = (op(args[0]) < op(args[1])) ? 1 : 0;
     else if (opc == "isnull")
       reg[pc] = (op(args[0]) == 0) ? 1 : 0;
+    else if (opc == "istype") {
+      final ref = op(args[0]);
+      if (ref == 0) {
+        // Null is always false.
+        reg[pc] = 0;
+      } else {
+        final reftypeid = memory.load(ref);
+        final typename = args[1].split("_type")[0];
+        final type = Type.typeMap[typename];
+        final match = (type == dynamicType) ? true : (type.id == reftypeid);
+        reg[pc] =  match ? 1 : 0;
+      }
+    }
     else if (opc == "br")
       pc = op(args[0]) - 1;
     else if (opc == "blbc")

@@ -82,6 +82,7 @@ const icmpeq = const Opcode._('cmpeq');
 const icmplt = const Opcode._('cmplt');
 const icmple = const Opcode._('cmple');
 const iisnull = const Opcode._('isnull');
+const iistype = const Opcode._('istype');
 
 // Function call opcodes.
 const inop = const Opcode._('nop');
@@ -431,11 +432,29 @@ Node op2(Token op, Node x, Node y)  /* x = x op y */
 }
 
 
+Node istype(Token op, Node x, Node y) {
+  // TODO(vsm): This should be statically folded.
+  // TODO(vsm): Handle bool.
+  if (y.type == intType) {
+    y = findObj(globalScope, "Integer");
+  }
+
+  x = box(x);
+
+  Node t = putOpNodeNode(iistype, x, y, boolType);
+  final opcode = (op == TOKEN_IS) ? iblbc : iblbs;
+  x = putOpNode(opcode, t, null);
+  x.jmpFalse = null;
+  x.jmpTrue = pc.prv;
+  return x;
+}
+
+
 Node relation(Token op, Node x, Node y)
 {
   Node t;
 
-  if (op == TOKEN_EQL) {
+  if (op == TOKEN_EQL || op == TOKEN_NEQ) {
     // isnull
     var ref = null;
     if (isNull(x)) {
@@ -445,7 +464,8 @@ Node relation(Token op, Node x, Node y)
     }
     if (ref != null) {
       t = putOpNode(iisnull, ref, boolType);
-      x = putOpNode(iblbc, t, null);
+      final opcode = (op == TOKEN_EQL) ? iblbc : iblbs;
+      x = putOpNode(opcode, t, null);
       x.jmpFalse = null;
       x.jmpTrue = pc.prv;
       return x;
@@ -691,6 +711,7 @@ void decode()
       case icmpeq:
       case icmple:
       case icmplt:
+      case iistype:
       case istore:
       case imove:
       case icheckbounds:
