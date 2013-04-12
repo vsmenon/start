@@ -1,3 +1,6 @@
+// NOTE: This is not a Start sample.
+// It's a shim library used to make Start samples run in the Dart runtime.
+
 library stdio;
 
 var _buffer = new StringBuffer();
