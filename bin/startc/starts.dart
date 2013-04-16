@@ -331,6 +331,7 @@ Token nextToken()
 void initializeTokenizer(String script)
 {
   _line = 0;
+  _position = 0;
   _script = script;
   if (_script == null) error("could not open file");
   _line = 1;
