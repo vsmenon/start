@@ -292,9 +292,9 @@ int resolveOperand(Memory memory, RegisterStack reg, String operand) {
     // TODO(vsm): Delete this and clean up base above.
     return memory.load(memory.fp+offset);
   } else if (operand[0] == "(")
-    return reg[int.parse(operand.slice(1,-1))];
+    return reg[int.parse(operand.substring(1, operand.length - 1))];
   else if (operand[0] == "[")
-    return int.parse(operand.slice(1,-1));
+    return int.parse(operand.substring(1, operand.length - 1));
   else
     return int.parse(operand);
 }
