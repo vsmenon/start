@@ -1,6 +1,6 @@
 library starti;
 
-import 'dart:typeddata';
+import 'dart:typed_data';
 
 // The machine word size.  This must match the value in startc.
 const WORD_SIZE = 4;
