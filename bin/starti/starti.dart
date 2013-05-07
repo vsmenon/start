@@ -32,6 +32,7 @@ void _check(bool flag, String message) {
 
 int cost(String opc) {
   final costMap = {
+    "nop": 0,
     "new": 10,
     "lddynamic": 100,
     "stdynamic": 100,
