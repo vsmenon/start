@@ -331,6 +331,7 @@ String execute(String bytecode, { bool debug: false }) {
   var instructionCount = 0;
   var icacheMisses = 0;
   var branchMispredicts = 0;
+  final counters = new Map<int, int>();
 
   // Instruction cache simulator
   final icachesize = 256;
@@ -605,6 +606,12 @@ String execute(String bytecode, { bool debug: false }) {
     }
     else if ((opc == "entrypc") || (opc == "nop"))
       pc = pc;
+    else if (opc == "count") {
+      int counterId = op(args[0]);
+      if (!counters.containsKey(counterId))
+        counters[counterId] = 0;
+      counters[counterId]++;
+    }
     else
       _check(false, "Unknown opcode $opc");
     if (debug && reg._current != null)
@@ -619,5 +626,12 @@ String execute(String bytecode, { bool debug: false }) {
 - Branch mispredicts : $branchMispredicts
 - Allocated bytes: ${memory._allocatedBytes}
 """;
-  return stats;
+  var counts = "";
+  if (!counters.isEmpty) {
+    counts = "\n- Counts : \n";
+    for (var key in counters.keys.toList().sort((i, j) => (i < j))) {
+      counts += "  $key: ${counters[key]}";
+    }
+  }
+  return stats + counts;
 }
