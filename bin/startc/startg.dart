@@ -106,6 +106,9 @@ const imove = const Opcode._('move');
 const iwrite = const Opcode._('write');
 const iwrl = const Opcode._('wrl');
 
+// Instrumentation.
+const icount = const Opcode._('count');
+
 // Memory allocation.
 const inew = const Opcode._('new');
 const inewlist = const Opcode._('newlist');
@@ -592,7 +595,10 @@ void ioCall(Node x, Node y)
   Node z;
 
   if (x.val < 3) testInt(y);
-  if (x.val == 2) {
+  if (x.val == 1) {
+    y = unbox(y);
+    putOpNode(icount, y, null);
+  } else if (x.val == 2) {
     y = unbox(y);
     putOpNode(iwrite, y, null);
   } else {
@@ -731,6 +737,7 @@ void decode()
       case iret:
       case icall:
       case iwrite:
+      case icount:
       case ichecknull:
       case inew:
       case inewlist:

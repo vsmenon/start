@@ -467,12 +467,7 @@ void procedureCallM(Node obj, Node x)
   if (x.kind == KIND_SPROC) {
     y = new Node();
     if (x.val == 1) {
-      if (token != TOKEN_IDENT) error("identifier expected");
-      obj = findObj(globalScope, currentAsString);
-      if (obj == null) error("unknown identifier");
-      makeNodeDesc(y, obj);
-      token = nextToken();  // consume ident before calling Designator
-      y = designatorM(y);
+      y = expression(y);
     } else if (x.val == 2) {
       y = expression(y);
     }
@@ -801,6 +796,7 @@ String compile(String input)
   globalScope = insertObj(globalScope, KIND_TYPE, listType, "List", WORD_SIZE*2);
   globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "dynamic", WORD_SIZE);
   globalScope = insertObj(globalScope, KIND_TYPE, dynamicType, "var", WORD_SIZE);
+  globalScope = insertObj(globalScope, KIND_SPROC, null, "Instrument", 1);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLong", 2);
   globalScope = insertObj(globalScope, KIND_SPROC, null, "WriteLine", 3);
 

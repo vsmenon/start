@@ -629,9 +629,11 @@ String execute(String bytecode, { bool debug: false }) {
 """;
   var counts = "";
   if (!counters.isEmpty) {
-    counts = "\n- Counts : \n";
-    for (var key in counters.keys.toList().sort((i, j) => (i < j))) {
-      counts += "  $key: ${counters[key]}";
+    counts = "- Counts : ";
+    var keys = counters.keys.toList();
+    keys.sort();
+    for (var key in keys) {
+      counts += "\n  $key: ${counters[key]}";
     }
   }
   return stats + counts;

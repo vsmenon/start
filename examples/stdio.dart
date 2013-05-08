@@ -22,3 +22,7 @@ void _printf(String str) {
 void WriteLong(int n) => _printf(' $n');
 
 void WriteLine() => _printf('\n');
+
+void Instrument(int counter) {
+  // TODO(vsm): Instrument in Dart.
+}
