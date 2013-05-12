@@ -92,6 +92,7 @@ int _parse(String bytecode, List<Instruction> instructions) {
   for (final line in bytecode.split('\n')) {
     var words = line.trim().split(" ");
     if (line.trim() == "") continue;
+    if (words[0][0] == "#") continue;
     if (words[0] == "type") {
       final typename = words[1].substring(0, words[1].length-1);
       final type = new Type(typename, words.sublist(2));
