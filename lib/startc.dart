@@ -1,7 +1,7 @@
 library startc;
 
-part 'startg.dart';
-part 'starts.dart';
+part 'startc/startg.dart';
+part 'startc/starts.dart';
 
 // The machine word size.  This must match the value in starti.
 const WORD_SIZE = 4;

@@ -3,8 +3,8 @@ library start;
 import 'dart:io';
 import 'package:args/args.dart';
 
-import 'startc/startc.dart';
-import 'starti/starti.dart';
+import 'package:start/startc.dart';
+import 'package:start/starti.dart';
 
 final parser = new ArgParser();
 
