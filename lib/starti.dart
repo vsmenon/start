@@ -303,6 +303,9 @@ int resolveOperand(Memory memory, RegisterStack reg, String operand) {
 
 String execute(String bytecode, { bool debug: false }) {
   // Builtin types.
+  Type.idMap = new Map();
+  Type.typeMap = new Map();
+  Type._idgen = 0;
   final inttype = new Type("int", []);
   final booltype = new Type("bool", []);
   final listtype = new Type("List", ["length#$WORD_SIZE:int"]);
