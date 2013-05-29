@@ -612,7 +612,17 @@ String execute(String bytecode, { bool debug: false }) {
     else if ((opc == "entrypc") || (opc == "nop"))
       pc = pc;
     else if (opc == "count") {
-      int counterId = op(args[0]);
+      var counterId = args[0];
+      // Use index 1 because quotes surround the actual arg.
+      if (counterId.length > 1) {
+        if (counterId[1] != "\$") {
+          // If the counterId doesn't start with a $ then unpack it.
+          counterId = op(counterId);
+        } else {
+          // Trim the quotes around the arg name.
+          counterId = counterId.substring(1, counterId.length-1);
+        }
+      }
       if (!counters.containsKey(counterId))
         counters[counterId] = 0;
       counters[counterId]++;
