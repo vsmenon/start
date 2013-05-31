@@ -336,7 +336,7 @@ String execute(String bytecode, { bool debug: false }) {
   var instructionCount = 0;
   var icacheMisses = 0;
   var branchMispredicts = 0;
-  final counters = new Map<int, int>();
+  final counters = new Map<dynamic, int>();
 
   // Instruction cache simulator
   final icachesize = 256;
@@ -613,15 +613,12 @@ String execute(String bytecode, { bool debug: false }) {
       pc = pc;
     else if (opc == "count") {
       var counterId = args[0];
-      // Use index 1 because quotes surround the actual arg.
-      if (counterId.length > 1) {
-        if (counterId[1] != "\$") {
-          // If the counterId doesn't start with a $ then unpack it.
-          counterId = op(counterId);
-        } else {
-          // Trim the quotes around the arg name.
-          counterId = counterId.substring(1, counterId.length-1);
-        }
+      if (counterId[0] != r'$') {
+        // If the counterId doesn't start with a $ then unpack it.
+        counterId = op(counterId);
+      } else {
+        // Trim the quotes around the arg name.
+        counterId = counterId.substring(1, counterId.length);
       }
       if (!counters.containsKey(counterId))
         counters[counterId] = 0;
@@ -645,7 +642,17 @@ String execute(String bytecode, { bool debug: false }) {
   if (!counters.isEmpty) {
     counts = "- Counts : ";
     var keys = counters.keys.toList();
-    keys.sort();
+    var counterCompare = (a, b) {
+      // Sort nums ahead of strings.
+      if (a is num && b is! num) {
+        return -1;
+      } else if (a is! num && b is num) {
+        return 1;
+      } else {
+        return Comparable.compare(a, b);
+      }
+    };
+    keys.sort(counterCompare);
     for (var key in keys) {
       counts += "\n  $key: ${counters[key]}";
     }
