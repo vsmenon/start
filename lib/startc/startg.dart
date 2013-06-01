@@ -574,7 +574,7 @@ Node parameter(Node x, TypeDesc ftyp, Kind clss)
   } else if (x.type == dynamicType) {
     x = checkType(x, ftyp);
   } else {
-    if (x.type != ftyp) error("Incorrect parameter type");
+    if (x.type != ftyp && !isNull(x)) error("Incorrect parameter type");
   }
   x = putOpNode(iparam, x, null);
   return x;

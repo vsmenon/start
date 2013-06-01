@@ -440,7 +440,7 @@ void expList(Node proc)
   x = expression(x);
   if ((curr == null) || (curr.dsc != proc)) error("too many parameters");
   if (x.type != curr.type && x.type != dynamicType
-      && curr.type != dynamicType) error("incorrect type");
+      && curr.type != dynamicType && !isNull(x)) error("incorrect type");
   x = parameter(x, curr.type, curr.kind);
   curr = curr.next;
   while (token == TOKEN_COMMA) {

@@ -123,7 +123,7 @@ class Memory {
   static const STACK_WORD_SIZE = STACK_SIZE ~/ WORD_SIZE;
 
   // Amount of heap space in bytes and longs.
-  static const HEAP_SIZE = 1048576;
+  static const HEAP_SIZE = 16777216;
   static const HEAP_WORD_SIZE = HEAP_SIZE ~/ WORD_SIZE;
 
   static const MEMORY_WORD_SIZE = GLOBAL_DATA_WORD_SIZE + STACK_WORD_SIZE

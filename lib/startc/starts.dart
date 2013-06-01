@@ -41,7 +41,7 @@ const TOKEN_VOID = const Token._('void');
 const TOKEN_EOF = const Token._('eof');
 const TOKEN_NEW = const Token._('new');
 
-const MAX_ID_LENGTH = 16;
+const MAX_ID_LENGTH = 64;
 
 int _currentAsInt = null;
 int get currentAsInt {
