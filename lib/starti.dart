@@ -86,7 +86,7 @@ class Type {
   int get size => fieldMap.length * WORD_SIZE + WORD_SIZE;
 }
 
-int _parse(String bytecode, List<Instruction> instructions) {
+int _parse(String bytecode, List<Instruction> instructions, Map<dynamic, int> counters) {
   int entrypc;
   // Read in the program from stdin
   for (final line in bytecode.split('\n')) {
@@ -106,6 +106,11 @@ int _parse(String bytecode, List<Instruction> instructions) {
     final opcode = words[2];
     final args = words.sublist(3, words.length);
     instructions.add(new Instruction(opcode, args));
+    if (opcode == "count" && args[0][0] == r'$') {
+      // Static counters will show count of 0 if not executed.
+      final counterId = args[0].substring(1, args[0].length);
+      counters[counterId] = 0;
+    }
     if (opcode == "entrypc")
       entrypc = instructions.length;
   }
@@ -314,7 +319,8 @@ String execute(String bytecode, { bool debug: false }) {
 
   // Instructions indexed by pc-1
   final instructions = [];
-  final entrypc = _parse(bytecode, instructions);
+  final counters = new Map<dynamic, int>();
+  final entrypc = _parse(bytecode, instructions, counters);
 
   final memory = new Memory();
   final reg = new RegisterStack();
@@ -336,7 +342,6 @@ String execute(String bytecode, { bool debug: false }) {
   var instructionCount = 0;
   var icacheMisses = 0;
   var branchMispredicts = 0;
-  final counters = new Map<dynamic, int>();
 
   // Instruction cache simulator
   final icachesize = 256;
