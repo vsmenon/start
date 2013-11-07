@@ -52,9 +52,8 @@ void runTests(String vm, String path) {
 }
 
 void main() {
-  final options = new Options();
-  final vm = options.executable;
-  final script = options.script;
-  Future<String> dir = new File(script).directory().then((d) => d.path);
-  dir.then((path) => runTests(vm, '$path/..'));
+  final vm = Platform.executable;
+  final script = Platform.script.path;
+  final path = new File(script).parent.parent.path;
+  runTests(vm, '$path');
 }

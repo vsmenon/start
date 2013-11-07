@@ -8,10 +8,7 @@ import 'package:start/starti.dart';
 
 final parser = new ArgParser();
 
-ArgResults options() {
-  final options = new Options();
-  final argv = options.arguments;
-
+ArgResults options(List argv) {
   parser.addFlag('compile', abbr: 'c', help: 'Compile only', defaultsTo: false);
   parser.addFlag('debug', abbr: 'd', help: 'Print debugging info',
       defaultsTo: false);
@@ -22,9 +19,9 @@ ArgResults options() {
   return parser.parse(argv);
 }
 
-void main()
+void main(List argv)
 {
-  final args = options();
+  final args = options(argv);
   if (args['help']) {
     print('dart bin/start.dart <filename>');
     print(parser.getUsage());

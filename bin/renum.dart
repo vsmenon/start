@@ -61,10 +61,8 @@ void _renum(String bytecode, Map<num, int> instMap) {
   }
 }
 
-void main()
+void main(List args)
 {
-  final args = (new Options()).arguments;
-
   final filename = args[0];
 
   final file = new File(filename);

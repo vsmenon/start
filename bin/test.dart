@@ -31,11 +31,10 @@ Future<List<String>> run(String vm, String interp, String dir, String test) {
 }
 
 void main() {
-  final options = new Options();
-  final vm = options.executable;
-  final script = options.script;
-  String path = new File(script).directory.path;
-  runTests(vm, '$path/..');
+  final vm = Platform.executable;
+  final script = Platform.script.path;
+  String path = new File(script).parent.parent.path;
+  runTests(vm, '$path');
 }
 
 void runTests(String vm, String path) {

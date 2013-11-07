@@ -166,7 +166,7 @@ class Memory {
   }
 
   // Global data pointer.
-  const gp = STACK_SIZE;
+  final gp = STACK_SIZE;
 
   // Stack frame pointer.
   int fp;
