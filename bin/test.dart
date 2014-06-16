@@ -41,7 +41,7 @@ void runTests(String vm, String path) {
   final interp = '$path/bin/start.dart';
   for (final name in TESTS) {
    test('typed $name', () {
-     final check = expectAsync1((results) {
+     final check = expectAsync((results) {
        final dart = results[0];
        final start = results[1];
        expect(start, equals(dart));
@@ -53,7 +53,7 @@ void runTests(String vm, String path) {
 
   for (final name in TESTS) {
    test('untyped $name', () {
-     final check = expectAsync1((results) {
+     final check = expectAsync((results) {
        final dart = results[0];
        final start = results[1];
        expect(start, equals(dart));
