@@ -1,8 +1,6 @@
 name: start
 description: A sample command-line application
 dependencies:
-  unittest: any
+  analyzer: any
   args: any
-
-#dependencies:
-#  unittest: any
+  unittest: any

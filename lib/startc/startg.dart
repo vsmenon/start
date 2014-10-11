@@ -9,11 +9,10 @@ class Kind {
 
 const KIND_VAR = const Kind._('Var');
 const KIND_CONST = const Kind._('Const');
-const KIND_FLD = const Kind._('Fld');
+const KIND_FIELD = const Kind._('Field');
 const KIND_TYPE = const Kind._('Type');
-const KIND_PROC = const Kind._('Proc');
-const KIND_SPROC = const Kind._('SProc');
-const KIND_ADDR = const Kind._('Addr');
+const KIND_FUNC = const Kind._('Func');
+const KIND_SYSCALL = const Kind._('SysCall');
 const KIND_DYN_ADDR = const Kind._('DynAddr');
 const KIND_INST = const Kind._('Inst');
 
@@ -37,7 +36,7 @@ class TypeDesc {
   final String name;
   Form form;
 
-  Node fields;  // linked list of the fields in a struct
+  Scope fields = new Scope();  // linked list of the fields in a struct
   int size = 0;  // total size of the type
   TypeDesc base;  // base type (for list or pointer)
   TypeDesc _pointer; // cached pointer type.  Use the ref function.
@@ -46,22 +45,107 @@ class TypeDesc {
 class Node {
   Kind kind;  // Var, Const, Field, Type, Proc, SProc, Addr, Inst
   int lev = 0;  // 0 = global, 1 = local
-  Node next;  // linked list of all objects in same scope
-  Node dsc;  // Proc: link to procedure scope (head)
+  Scope dsc;  // Proc: link to procedure scope (head)
   TypeDesc type;  // type
   String name;  // name
   int val = 0;  // Const: value; Var: addr; Fld: offset; SProc: num; Type: size
-  Opcode op;  // operation of instruction
-  Node x, y, z;  // the operands
-  Node prv, nxt;  // previous and next instruction
-  int line = 0;  // line number for printing purposes
-  Node jmpTrue, jmpFalse;  // Jmp: true and false chains; Proc: true = entry
+
   Node original;  // Pointer to original node object if a copy was made
+  Instruction entry;  // For functions
+}
+
+class DynamicAddress extends Node {
+  DynamicAddress(this.base, this.field);
+
+  final Node base;
+  final Node field;
+}
+
+class Instruction extends Node {
+  Opcode op;
+  Node x, y, z;  // the operands
+  Instruction prv, nxt;  // previous and next instruction
+  int line = 0;  // line number for printing purposes
+  Instruction jmpTrue, jmpFalse;  // Jmp: true and false chains; Proc: true = entry
+}
+
+class Scope {
+  Scope([this.parent = null]);
+
+  final Scope parent;
+  final List<Node> nodes = new List<Node>();
+
+  void validate() {
+    int depth = 0;
+    for (Scope p = parent; p != null; p = p.parent)
+      depth++;
+    bool params = true;
+    for (Node node in nodes) {
+      assert(node.lev == depth);
+      Scope desc = node.dsc;
+      if (params) {
+        if (desc != null)
+          assert(desc == this);
+        else
+          params = false;
+      } else {
+        assert(desc == null);
+      }
+    }
+  }
+
+  Node find(String id) {
+    Node node = nodes.firstWhere((Node n) => n.name == id, orElse: () => null);
+
+    if (node != null) {
+      return node;
+    } else {
+      return parent != null ? parent.find(id) : null;
+    }
+  }
+
+  // This function adds a new object at the end of the object list pointed to
+  // by root and returns a pointer to the new node.
+  Node add(String id) {
+    for (Node current in nodes) {
+      if (current.name == id) {
+        error("duplicate identifier");
+      }
+    }
+
+    Node node = new Node();
+    node.kind = null;
+    node.lev = parent == null ? 0 : 1;
+    node.dsc = null;
+    node.type = null;
+    node.name = id;
+    node.val = 0;
+    nodes.add(node);
+    return node;
+  }
+
+
+  Node insert(Kind kind, TypeDesc type, String name, int val)
+  {
+    for (Node current in nodes) {
+      if (current.name == name)
+        error("duplicate symbol");
+    }
+
+    Node node = new Node();
+    nodes.add(node);
+    node.kind = kind;
+    node.type = type;
+    node.name = name;
+    node.val = val;
+    node.dsc = null;
+    node.lev = 0;
+    return node;
+  }
 }
 
 TypeDesc intType, boolType, dynamicType, listType, boxedIntType;
-int currentLevel = 0;
-Node pc;
+Instruction pc;
 
 class Opcode {
   const Opcode._(this._value);
@@ -122,7 +206,8 @@ const ichecktype = const Opcode._('checktype');
 const ilddynamic = const Opcode._('lddynamic');
 const istdynamic = const Opcode._('stdynamic');
 
-Node code, entrypc, fp, gp;
+Instruction code, entrypc;
+Node fp, gp;
 
 /*****************************************************************************/
 
@@ -145,11 +230,11 @@ TypeDesc deref(TypeDesc t) {
 
 // This function adds a new instruction at the end of the instruction list
 // and sets the operation to op and the operands to x and y.
-Node putOpNodeNodeNode(Opcode op, Node x, Node y, Node z, TypeDesc type)
+Instruction putOpNodeNodeNode(Opcode op, Node x, Node y, Node z, TypeDesc type)
 {
-  Node i;
+  Instruction i;
 
-  pc.nxt = new Node();
+  pc.nxt = new Instruction();
   i = pc;
   pc = pc.nxt;
   pc.kind = KIND_INST;
@@ -169,27 +254,27 @@ Node putOpNodeNodeNode(Opcode op, Node x, Node y, Node z, TypeDesc type)
   return i;
 }
 
-Node putOpNodeNode(Opcode op, Node x, Node y, TypeDesc type)
+Instruction putOpNodeNode(Opcode op, Node x, Node y, TypeDesc type)
 {
   return putOpNodeNodeNode(op, x, y, null, type);
 }
 
-Node putOpNode(Opcode op, Node x, TypeDesc type)
+Instruction putOpNode(Opcode op, Node x, TypeDesc type)
 {
   return putOpNodeNode(op, x, null, type);
 }
 
 
-Node putOp(Opcode op, TypeDesc type)
+Instruction putOp(Opcode op, TypeDesc type)
 {
   return putOpNodeNode(op, null, null, type);
 }
 
 
 void makeDynamicNodeDesc(Node x, String fieldName) {
-  x.kind = KIND_FLD;
+  x.kind = KIND_FIELD;
   x.type = dynamicType;
-  x.lev = currentLevel;
+  x.lev = -1;
   x.name = fieldName;
 }
 
@@ -200,20 +285,22 @@ void makeConstNodeDesc(Node x, TypeDesc typ, int val)
   x.kind = KIND_CONST;
   x.type = typ;
   x.val = val;
-  x.lev = currentLevel;
+  x.lev = -1;
 }
 
 
 // This function make a COPY of a CSGNode object
-void makeNodeDesc(Node x, Node y) {
+Node makeNodeDesc(Node y) {
+  assert(y is! Instruction);
+  Node x = new Node();
   int i;
 
   x.kind = y.kind;
   x.type = y.type;
   x.val = y.val;
   x.lev = y.lev;
-  x.jmpTrue = y.jmpTrue;
   x.name = y.name;
+  x.entry = y.entry;
 
   // Make the 'original' field of the copy to point back to original Node object
   if (y.original == null) {
@@ -221,14 +308,13 @@ void makeNodeDesc(Node x, Node y) {
   } else {
     x.original = y.original;
   }
+  return x;
 }
 
 
 Node dynamicAddr(Node ref, Node field) {
-  Node addr = new Node();
+  final addr = new DynamicAddress(ref, field);
   addr.kind = KIND_DYN_ADDR;
-  addr.x = ref;
-  addr.y = field;
   return addr;
 }
 
@@ -239,8 +325,8 @@ Node unbox(Node x) {
   if (x.type == dynamicType) {
     final checked = checkNull(x);
     final boxed = checkType(checked, boxedIntType);
-    final ctr = findObj(globalScope, "Integer");
-    final field = findObj(ctr.type.fields, "value");
+    final ctr = globalScope.find("Integer");
+    final field = ctr.type.fields.find("value");
     final addr = fieldAddress(boxed, field, false);
     return load(addr);
   }
@@ -255,9 +341,9 @@ Node box(Node x) {
     error("Cannot box bool type");
   }
   if (x.type == intType) {
-    final ctr = findObj(globalScope, "Integer");
+    final ctr = globalScope.find("Integer");
     final boxed = putOpNode(inew, ctr, boxedIntType);
-    final field = findObj(ctr.type.fields, "value");
+    final field = ctr.type.fields.find("value");
     final addr = fieldAddress(boxed, field, false);
     store(addr, x);
     return boxed;
@@ -285,8 +371,9 @@ Node checkNull(Node x) {
 
 Node load(Node x) {
   if (x.kind == KIND_DYN_ADDR) {
-    x = putOpNodeNode(ilddynamic, x.x, x.y, dynamicType);
-  } else if (x.kind == KIND_ADDR) {
+    final addr = x as DynamicAddress;
+    x = putOpNodeNode(ilddynamic, addr.base, addr.field, dynamicType);
+  } else if (x.kind == KIND_INST && x.type.form == FORM_POINTER) {
     x = putOpNode(iload, x, deref(x.type));
   } else if ((x.kind == KIND_VAR) && (x.lev == 0)) {
     final type = x.type;
@@ -311,7 +398,6 @@ Node fieldAddress(Node x, Node y, bool testNull) { /* x = x.y */
     x = dynamicAddr(x, y);
   } else {
     x = putOpNodeNode(iadd, x, y, ref(y.type));
-    x.kind = KIND_ADDR;
   }
   return x;
 }
@@ -325,13 +411,11 @@ Node indexAddress(Node x, Node y) { /* x = x[y] */
   Node indexoffset = new Node();
   makeConstNodeDesc(indexoffset, intType, intType.size);
 
-  if (x.kind != KIND_ADDR) {
-    if (x.kind != KIND_INST) {
-      if (x.lev == 0) {
-        final type = x.type;
-        x = putOpNodeNode(iadd, x, gp, ref(type));
-        x = putOpNode(iload, x, type);
-      }
+  if (x.kind != KIND_INST) {
+    if (x.lev == 0) {
+      final type = x.type;
+      x = putOpNodeNode(iadd, x, gp, ref(type));
+      x = putOpNode(iload, x, type);
     }
   }
   x = checkNull(x);
@@ -339,10 +423,9 @@ Node indexAddress(Node x, Node y) { /* x = x[y] */
   y = unbox(y);
   checkBounds(x, y);
   x = putOpNodeNode(iadd, x, baseoffset, ref(basetype));
-  y = op2(TOKEN_TIMES, y, indexoffset);
+  y = op2(TokenType.STAR, y, indexoffset);
 
   x = putOpNodeNode(iadd, x, y, ref(basetype));
-  x.kind = KIND_ADDR;
   return x;
 }
 
@@ -366,7 +449,7 @@ Node setLabel(Node lbl) {
 
 // This function sets the target of a forward jump, call, or branch once
 // the target is being compiled.
-void fixLink(Node lbl) {
+void fixLink(Instruction lbl) {
   if (lbl != null) {
     if ((lbl.op == icall) || (lbl.op == ibr)) {
       lbl.x = pc;
@@ -377,12 +460,12 @@ void fixLink(Node lbl) {
 }
 
 
-void backJump(Node lbl) {
+void backJump(Instruction lbl) {
   putOpNode(ibr, lbl, null);
 }
 
 
-Node forwardJump(Node lbl) {
+Instruction forwardJump(Instruction lbl) {
   lbl = putOpNode(ibr, lbl, null);
   lbl = pc.prv;
   return lbl;
@@ -405,11 +488,11 @@ void testBool(Node x) {
 /*****************************************************************************/
 
 
-Node op1(Token op, Node x) { /* x = op x */
+Node op1(TokenType op, Node x) { /* x = op x */
   x = unbox(x);
-  if (op == TOKEN_PLUS) {
+  if (op == TokenType.PLUS) {
     testInt(x);
-  } else if (op == TOKEN_MINUS) {
+  } else if (op == TokenType.MINUS) {
     testInt(x);
     x = putOpNode(ineg, x, x.type);
   }
@@ -417,7 +500,7 @@ Node op1(Token op, Node x) { /* x = op x */
 }
 
 
-Node op2(Token op, Node x, Node y)  /* x = x op y */
+Node op2(TokenType op, Node x, Node y)  /* x = x op y */
 {
   assert(x != null);
   assert(y != null);
@@ -425,39 +508,40 @@ Node op2(Token op, Node x, Node y)  /* x = x op y */
   y = unbox(y);
 
   switch (op) {
-    case TOKEN_PLUS: x = putOpNodeNode(iadd, x, y, intType); break;
-    case TOKEN_MINUS: x = putOpNodeNode(isub, x, y, intType); break;
-    case TOKEN_TIMES: x = putOpNodeNode(imul, x, y, intType); break;
-    case TOKEN_DIV: x = putOpNodeNode(idiv, x, y, intType); break;
-    case TOKEN_MOD: x = putOpNodeNode(imod, x, y, intType); break;
+    case TokenType.PLUS: x = putOpNodeNode(iadd, x, y, intType); break;
+    case TokenType.MINUS: x = putOpNodeNode(isub, x, y, intType); break;
+    case TokenType.STAR: x = putOpNodeNode(imul, x, y, intType); break;
+    case TokenType.TILDE_SLASH: x = putOpNodeNode(idiv, x, y, intType); break;
+    case TokenType.PERCENT: x = putOpNodeNode(imod, x, y, intType); break;
   }
   return x;
 }
 
 
-Node istype(Token op, Node x, Node y) {
+Node istype(TokenType op, Node x, Node y) {
   // TODO(vsm): This should be statically folded.
   // TODO(vsm): Handle bool.
   if (y.type == intType) {
-    y = findObj(globalScope, "Integer");
+    y = globalScope.find("Integer");
   }
 
   x = box(x);
 
-  Node t = putOpNodeNode(iistype, x, y, boolType);
-  final opcode = (op == TOKEN_IS) ? iblbc : iblbs;
-  x = putOpNode(opcode, t, null);
-  x.jmpFalse = null;
-  x.jmpTrue = pc.prv;
-  return x;
+  Instruction test = putOpNodeNode(iistype, x, y, boolType);
+  final opcode = (op == TokenType.IS) ? iblbc : iblbs;
+  Instruction branch = putOpNode(opcode, test, null);
+  branch.jmpFalse = null;
+  branch.jmpTrue = pc.prv;
+  return branch;
 }
 
 
-Node relation(Token op, Node x, Node y)
+Node relation(TokenType op, Node x, Node y)
 {
-  Node t;
+  Instruction test;
+  Instruction branch;
 
-  if (op == TOKEN_EQL || op == TOKEN_NEQ) {
+  if (op == TokenType.EQ_EQ || op == TokenType.BANG_EQ) {
     // isnull
     var ref = null;
     if (isNull(x)) {
@@ -466,12 +550,12 @@ Node relation(Token op, Node x, Node y)
       ref = box(x);
     }
     if (ref != null) {
-      t = putOpNode(iisnull, ref, boolType);
-      final opcode = (op == TOKEN_EQL) ? iblbc : iblbs;
-      x = putOpNode(opcode, t, null);
-      x.jmpFalse = null;
-      x.jmpTrue = pc.prv;
-      return x;
+      test = putOpNode(iisnull, ref, boolType);
+      final opcode = (op == TokenType.EQ_EQ) ? iblbc : iblbs;
+      branch = putOpNode(opcode, test, null);
+      branch.jmpFalse = null;
+      branch.jmpTrue = pc.prv;
+      return branch;
     }
   }
 
@@ -479,34 +563,34 @@ Node relation(Token op, Node x, Node y)
   y = unbox(y);
 
   switch (op) {
-    case TOKEN_EQL:
-      t = putOpNodeNode(icmpeq, x, y, boolType);
-      x = putOpNode(iblbc, t, null);
+    case TokenType.EQ_EQ:
+      test = putOpNodeNode(icmpeq, x, y, boolType);
+      branch = putOpNode(iblbc, test, null);
       break;
-    case TOKEN_NEQ:
-      t = putOpNodeNode(icmpeq, x, y, boolType);
-      x = putOpNode(iblbs, t, null);
+    case TokenType.BANG_EQ:
+      test = putOpNodeNode(icmpeq, x, y, boolType);
+      branch = putOpNode(iblbs, test, null);
       break;
-    case TOKEN_LSS:
-      t = putOpNodeNode(icmplt, x, y, boolType);
-      x = putOpNode(iblbc, t, null);
+    case TokenType.LT:
+      test = putOpNodeNode(icmplt, x, y, boolType);
+      branch = putOpNode(iblbc, test, null);
       break;
-    case TOKEN_GTR:
-      t = putOpNodeNode(icmple, x, y, boolType);
-      x = putOpNode(iblbs, t, null);
+    case TokenType.GT:
+      test = putOpNodeNode(icmple, x, y, boolType);
+      branch = putOpNode(iblbs, test, null);
       break;
-    case TOKEN_LEQ:
-      t = putOpNodeNode(icmple, x, y, boolType);
-      x = putOpNode(iblbc, t, null);
+    case TokenType.LT_EQ:
+      test = putOpNodeNode(icmple, x, y, boolType);
+      branch = putOpNode(iblbc, test, null);
       break;
-    case TOKEN_GEQ:
-      t = putOpNodeNode(icmplt, x, y, boolType);
-      x = putOpNode(iblbs, t, null);
+    case TokenType.GT_EQ:
+      test = putOpNodeNode(icmplt, x, y, boolType);
+      branch = putOpNode(iblbs, test, null);
       break;
   }
-  x.jmpFalse = null;
-  x.jmpTrue = pc.prv;
-  return x;
+  branch.jmpFalse = null;
+  branch.jmpTrue = pc.prv;
+  return branch;
 }
 
 
@@ -523,7 +607,7 @@ void store(Node x, Node y) { /* x = y */
   assert(y != null);
 
   var storedType = x.type;
-  if (x.kind == KIND_INST || x.kind == KIND_ADDR) {
+  if (x.kind == KIND_INST) {
     if (storedType.form != FORM_POINTER) error("expected pointer type");
     storedType = storedType.base;
   } else if (x.kind == KIND_DYN_ADDR) {
@@ -543,8 +627,9 @@ void store(Node x, Node y) { /* x = y */
   }
 
   if (x.kind == KIND_DYN_ADDR) {
-    x = putOpNodeNodeNode(istdynamic, y, x.x, x.y, null);
-  } else if ((x.kind == KIND_INST) || (x.kind == KIND_ADDR)) {
+    final addr = x as DynamicAddress;
+    x = putOpNodeNodeNode(istdynamic, y, addr.base, addr.field, null);
+  } else if (x.kind == KIND_INST) {
     // TODO(vsm): Restore?
     // assert(x.type.form == FORM_POINTER && x.type.base == y.type);
     putOpNodeNode(istore, y, x, null);
@@ -557,15 +642,7 @@ void store(Node x, Node y) { /* x = y */
   }
 }
 
-
-void adjustLevel(int n)
-{
-  currentLevel += n;
-  assert(0 <= currentLevel && currentLevel <= 1);
-}
-
-
-Node parameter(Node x, TypeDesc ftyp, Kind clss)
+Node parameter(Node x, TypeDesc ftyp, Kind kind)
 {
   if (ftyp == dynamicType) {
     x = box(x);
@@ -635,8 +712,7 @@ void ret(int size)
 
 void open()
 {
-  currentLevel = 0;
-  pc = new Node();
+  pc = new Instruction();
   pc.kind = KIND_INST;
   pc.op = inop;
   pc.prv = code;
@@ -645,14 +721,10 @@ void open()
 }
 
 
-void printBrakNode(Node x)
+void printBrakNode(Instruction x)
 {
   assert(x != null);
-  if (x.kind != KIND_INST) {
-    error("unknown brak kind");
-  } else {
-    printf(" [${x.line}]");
-  }
+  printf(" [${x.line}]");
 }
 
 
@@ -673,12 +745,12 @@ void printNode(Node x)
           printf(" ${x.name}_base#${x.val}");
         break;
       case KIND_CONST: printf(" ${x.val}"); break;
-      case KIND_FLD:
+      case KIND_FIELD:
         final offset = x.type != dynamicType ? x.val : '?';
         printf(" ${x.name}_offset#$offset");
         break;
-      case KIND_INST: case KIND_ADDR: printf(" (${x.line})"); break;
-      case KIND_PROC: printf(" [${x.jmpTrue.line}]"); break;
+      case KIND_INST: printf(" (${(x as Instruction).line})"); break;
+      case KIND_FUNC: printf(" [${x.entry.line}]"); break;
       case KIND_TYPE: printf(" ${x.type.name}_type#${x.type.size}"); break;
       default: error("unknown class ${x.kind}");
     }
@@ -687,7 +759,7 @@ void printNode(Node x)
 
 void assignLineNumbers()
 {
-  Node i;
+  Instruction i;
   int cnt;
 
   // assign line numbers
@@ -702,7 +774,7 @@ void assignLineNumbers()
 
 void decode()
 {
-  Node i;
+  Instruction i;
 
   i = code;
   while (i != null) {
@@ -793,7 +865,7 @@ void initializeParser()
 {
   entrypc = null;
 
-  code = new Node();
+  code = new Instruction();
   code.kind = KIND_INST;
   code.op = inop;
   code.prv = null;
@@ -806,11 +878,12 @@ void initializeParser()
   boxedIntType = new TypeDesc('Integer');
   boxedIntType.form = FORM_CLASS;
   boxedIntType.size = WORD_SIZE*2;
-  boxedIntType.fields = new Node();
-  boxedIntType.fields.name = "value";
-  boxedIntType.fields.type = intType;
-  boxedIntType.fields.kind = KIND_FLD;
-  boxedIntType.fields.val = intType.size;
+  boxedIntType.fields = new Scope();
+  boxedIntType.fields.nodes.add(new Node());
+  boxedIntType.fields.nodes[0].name = "value";
+  boxedIntType.fields.nodes[0].type = intType;
+  boxedIntType.fields.nodes[0].kind = KIND_FIELD;
+  boxedIntType.fields.nodes[0].val = intType.size;
 
   boolType = new TypeDesc('bool');
   boolType.form = FORM_BOOLEAN;
@@ -824,11 +897,12 @@ void initializeParser()
   listType.form = FORM_LIST;
   listType.size = WORD_SIZE;
   listType.base = dynamicType;
-  listType.fields = new Node();
-  listType.fields.name = "length";
-  listType.fields.type = intType;
-  listType.fields.kind = KIND_FLD;
-  listType.fields.val = intType.size;
+  listType.fields = new Scope();
+  listType.fields.nodes.add(new Node());
+  listType.fields.nodes[0].name = "length";
+  listType.fields.nodes[0].type = intType;
+  listType.fields.nodes[0].kind = KIND_FIELD;
+  listType.fields.nodes[0].val = intType.size;
 
   gp = new Node();
   intType.form = FORM_INTEGER;
@@ -837,4 +911,10 @@ void initializeParser()
   fp = new Node();
   intType.form = FORM_INTEGER;
   intType.size = WORD_SIZE;
+}
+
+void error(String msg) {
+  var message = "line FIXME error $msg\n";
+  print(message);
+  throw new Exception(message);
 }
