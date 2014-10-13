@@ -106,6 +106,8 @@ Node expression(Scope scope, Expression expr)
         ? TokenType.IS
             : expr.notOperator.type;
     return istype(op, x, y);
+  } else if (expr is MethodInvocation) {
+    return methodCall(scope, expr);
   }
   throw 'Unsupported expression $expr';
 }
@@ -228,6 +230,29 @@ void assignmentM(Scope scope, Expression lhs, Expression rhs)
   return;
 }
 
+Node methodCall(Scope scope, MethodInvocation node) {
+  String methodName = node.methodName.name;
+  NodeList<Expression> args = node.argumentList.arguments;
+
+  Node obj = scope.find(methodName);
+  if (obj == null) error("unknown identifier $methodName");
+  Node x = makeNodeDesc(obj);
+
+  if (x.kind == KIND_SYSCALL) {
+    Node y;
+    if (x.val == 1) {
+      y = expression(scope, args[0]);
+    } else if (x.val == 2) {
+      y = expression(scope, args[0]);
+    }
+    return ioCall(x, y);
+  } else {
+    // FIXME: assert(x.type == null);
+    if (args.length > 0)
+      expList(scope, obj, args);
+    return call(x, x.type);
+  }
+}
 
 void expList(Scope scope, Node proc, NodeList<Expression> args)
 {
@@ -348,7 +373,6 @@ class StackWalker extends RecursiveAstVisitor {
 
   AstNode visitVariableDeclarationList(VariableDeclarationList node) {
     String name = typeName(node.type);
-    // FIXME: Allow types in local scope as well.
     TypeDesc desc = typeDesc(globalScope, name);
 
     for (var decl in node.variables) {
@@ -409,8 +433,10 @@ class IRGenerator implements AstVisitor {
   AstNode visitFunctionDeclaration(FunctionDeclaration node) {
     String name = node.name.name;
     Node proc = _scope.add(name);
-    initProcObj(proc, KIND_FUNC, null, null, pc);
-    proc.dsc = _pushScope();
+    String typename = typeName(node.returnType);
+    TypeDesc desc = typename == "void" ? null : typeDesc(globalScope, typename);
+    initProcObj(proc, KIND_FUNC, null, desc, pc);
+    proc.dsc = _pushScope(proc);
     topOfStack = 0;
     if (name == "main") entryPoint();
 
@@ -423,15 +449,15 @@ class IRGenerator implements AstVisitor {
 
     if (-topOfStack > 32768) error("maximum stack frame size of 32kB exceeded");
     enter(-topOfStack);
-    int returnsize = 0;
-    for (Node curr in proc.dsc.nodes) {
-      if (curr.dsc == proc)
-        returnsize += WORD_SIZE;
-    }
     body.visitChildren(this);
-
+    // FIXME: Test for jumps.
+    // Return if no explicit return.
+    Instruction last = pc;
+    while (last.op == inop)
+      last = last.prv;
+    if (last.op != iretv && last.op != iret)
+      ret(proc.dsc.returnSize());
     _popScope(proc.dsc);
-    ret(returnsize);
     return node;
   }
 
@@ -462,28 +488,14 @@ class IRGenerator implements AstVisitor {
   }
 
   AstNode visitMethodInvocation(MethodInvocation node) {
-    String methodName = node.methodName.name;
-    NodeList<Expression> args = node.argumentList.arguments;
-
-    Node obj = _scope.find(methodName);
-    if (obj == null) error("unknown identifier $methodName");
-    Node x = makeNodeDesc(obj);
-
-    if (x.kind == KIND_SYSCALL) {
-      Node y;
-      if (x.val == 1) {
-        y = expression(_scope, args[0]);
-      } else if (x.val == 2) {
-        y = expression(_scope, args[0]);
-      }
-      ioCall(x, y);
-    } else {
-      assert(x.type == null);
-      if (args.length > 0)
-        expList(_scope, obj, args);
-      call(x);
-    }
+    methodCall(_scope, node);
     return node;
+  }
+
+  AstNode visitReturnStatement(ReturnStatement node) {
+    Node val = expression(_scope, node.expression);
+    // FIXME: Type check the result.
+    retv(_scope.returnSize(), val, _scope.proc.type);
   }
 
   AstNode visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
@@ -528,8 +540,8 @@ class IRGenerator implements AstVisitor {
 
   Scope _scope;
 
-  Scope _pushScope() {
-    _scope = new Scope(_scope);
+  Scope _pushScope(Node proc) {
+    _scope = new Scope(_scope, proc);
     return _scope;
   }
 

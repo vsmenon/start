@@ -599,7 +599,9 @@ String execute(String bytecode, { bool debug: false }) {
       // Allocate locals
       memory.pushN(op(args[0]) ~/ WORD_SIZE);
     }
-    else if (opc == "ret") {
+    else if ((opc == "ret") || (opc == "retv")) {
+      final args2pop = op(args[0]);
+      final retval = (opc == "retv") ? op(args[1]) : null;
       // Pop locals
       memory.sp = memory.fp;
       if (memory.fp == memory.gp)
@@ -609,10 +611,11 @@ String execute(String bytecode, { bool debug: false }) {
       memory.fp = memory.pop();
       pc = memory.pop();
       // Pop arguments
-      final args2pop = op(args[0]);
       memory.sp = memory.sp + args2pop;
       // Restore registers
       reg.pop();
+      if (opc == "retv")
+        reg[pc] = retval;
     }
     else if ((opc == "entrypc") || (opc == "nop"))
       pc = pc;

@@ -6,10 +6,7 @@ class Rational {
   var denominator;
 }
 
-// Return value for functions.
-var retVal;
-
-void gcd(var a, var b)
+gcd(var a, var b)
 {
   var c;
 
@@ -18,32 +15,33 @@ void gcd(var a, var b)
     a = b;
     b = c % b;
   }
-  retVal = a;
+  return a;
 }
 
-void makeRational(var n, var d) {
+dynamic makeRational(var n, var d) {
   var common;
+  var retVal;
 
-  gcd(n, d);
-  common = retVal;
+  common = gcd(n, d);
   retVal = new Rational();
   retVal.numerator = n ~/ common;
   retVal.denominator = d ~/ common;
+  return retVal;
 }
 
-void add(var a, var b) {
+dynamic add(var a, var b) {
   if (a is int) {
     if (b is int) {
-      retVal = a + b;
+      return a + b;
     } else {
-      makeRational(a * b.denominator + b.numerator, b.denominator);
+      return makeRational(a * b.denominator + b.numerator, b.denominator);
     }
   } else {
     // a is Rational
     if (b is int) {
-      makeRational(b * a.denominator + a.numerator, a.denominator);
+      return makeRational(b * a.denominator + a.numerator, a.denominator);
     } else {
-      makeRational(a.numerator * b.denominator + b.numerator * a.denominator, a.denominator * b.denominator);
+      return makeRational(a.numerator * b.denominator + b.numerator * a.denominator, a.denominator * b.denominator);
     }
   }
 }
@@ -52,8 +50,8 @@ void write(var a) {
   if (a is Rational) {
     WriteLong(a.numerator);
     WriteLong(a.denominator);
-    WriteLine();    
-  } else { 
+    WriteLine();
+  } else {
     // a is int
     WriteLong(a);
     WriteLine();
@@ -63,22 +61,21 @@ void write(var a) {
 void main() {
   var a, b;
   var x, y;
+  var retVal;
 
   a = 2;
   b = 5;
 
-  makeRational(1, 2);
-  x = retVal;
-  makeRational(2, 3);
-  y = retVal;
+  x = makeRational(1, 2);
+  y = makeRational(2, 3);
 
   write(a);
   write(x);
-  add(a, x);
+  retVal = add(a, x);
   write(retVal);
-  add(y, y);
+  retVal = add(y, y);
   write(retVal);
-  add(a, b);
+  retVal = add(a, b);
   write(retVal);
 }
 

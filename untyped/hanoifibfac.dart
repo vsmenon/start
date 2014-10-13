@@ -3,33 +3,31 @@ import 'stdio.dart';
 
 var a, m, q, r;
 var count;
-var res;
 
-
-void Factorial(var n)
+dynamic Factorial(var n)
 {
+  var res;
   if (n == 0) {
     res = 1;
   } else {
-    Factorial(n-1);
-    res = n * res;
+    res = n * Factorial(n-1);
   }
+  return res;
 }
 
 
-void FibRec(var n)
+dynamic FibRec(var n)
 {
-  var x, y;
+  var x, y, res;
 
   if (n <= 1) {
     res = 1;
   } else {
-    FibRec(n-1);
-    x = res;
-    FibRec(n-2);
-    y = res;
+    x = FibRec(n-1);
+    y = FibRec(n-2);
     res = x + y;
   }
+  return res;
 }
 
 
@@ -66,19 +64,18 @@ void Hanoi(var height)
 
 void main()
 {
+  var res;
   a = 16807;
   m = 127;
   m = m * 256 + 255;
   m = m * 256 + 255;
   m = m * 256 + 255;
-  q = m / a;
+  q = m ~/ a;
   r = m % a;
-  Factorial(7);
-  WriteLong(res);
+  WriteLong(Factorial(7));
   WriteLine();
   WriteLine();
-  FibRec(11);
-  WriteLong(res);
+  WriteLong(FibRec(11));
   WriteLine();
   WriteLine();
   Hanoi(3);

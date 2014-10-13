@@ -2,10 +2,8 @@
 import 'stdio.dart';
 
 var a, b;
-var res;
 
-
-void GCD(var a, var b)
+GCD(var a, var b)
 {
   var c;
 
@@ -18,22 +16,23 @@ void GCD(var a, var b)
     WriteLong(b);
     WriteLine();
   }
-  res = a;
+  return a;
 }
 
 
 void main()
 {
+  var res;
   a = 25733;
   b = 48611;
-  GCD(a, b);
+  res = GCD(a, b);
   WriteLong(res);
   WriteLine();
   WriteLine();
 
   a = 7485671;
   b = 7480189;
-  GCD(a, b);
+  res = GCD(a, b);
   WriteLong(res);
   WriteLine();
 }

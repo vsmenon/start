@@ -4,15 +4,17 @@ import 'stdio.dart';
 int m;
 int n;
 
-List tmp;
-void alloc(int m, int n) {
+List alloc(int m, int n) {
   int i;
-  tmp = new List(m);
+  List list;
+
+  list = new List(m);
   i = 0;
   while (i < m) {
-    tmp[i] = new List(n);
+    list[i] = new List(n);
     i = i + 1;
   }
+  return list;
 }
 
 void main()
@@ -26,14 +28,9 @@ void main()
   m = 4;
   n = 3;
 
-  alloc(m, n);
-  m1 = tmp;
-
-  alloc(n, m);
-  m2 = tmp;
-
-  alloc(n, n);
-  m3 = tmp;
+  m1 = alloc(m, n);
+  m2 = alloc(n, m);
+  m3 = alloc(n, n);
 
   i = 0;
   while (i < m) {

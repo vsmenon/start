@@ -70,9 +70,10 @@ class Instruction extends Node {
 }
 
 class Scope {
-  Scope([this.parent = null]);
+  Scope([this.parent = null, this.proc = null]);
 
   final Scope parent;
+  final Node proc;
   final List<Node> nodes = new List<Node>();
 
   void validate() {
@@ -142,6 +143,16 @@ class Scope {
     node.lev = 0;
     return node;
   }
+
+  int returnSize() {
+    assert(proc != null);
+    int size = 0;
+    for (Node curr in nodes) {
+      if (curr.dsc == proc)
+        size += WORD_SIZE;
+    }
+    return size;
+  }
 }
 
 TypeDesc intType, boolType, dynamicType, listType, boxedIntType;
@@ -175,6 +186,7 @@ const iparam = const Opcode._('param');
 const icall = const Opcode._('call');
 const ienter = const Opcode._('enter');
 const iret = const Opcode._('ret');
+const iretv = const Opcode._('retv');
 
 // Other control flow opcodes.
 const iblbs = const Opcode._('blbs');
@@ -642,7 +654,7 @@ void store(Node x, Node y) { /* x = y */
   }
 }
 
-Node parameter(Node x, TypeDesc ftyp, Kind kind)
+Node convert(Node x, TypeDesc ftyp)
 {
   if (ftyp == dynamicType) {
     x = box(x);
@@ -653,6 +665,12 @@ Node parameter(Node x, TypeDesc ftyp, Kind kind)
   } else {
     if (x.type != ftyp && !isNull(x)) error("Incorrect parameter type");
   }
+  return x;
+}
+
+Node parameter(Node x, TypeDesc ftyp, Kind kind)
+{
+  x = convert(x, ftyp);
   x = putOpNode(iparam, x, null);
   return x;
 }
@@ -661,25 +679,25 @@ Node parameter(Node x, TypeDesc ftyp, Kind kind)
 /*****************************************************************************/
 
 
-void call(Node x)
+Node call(Node x, TypeDesc type)
 {
-  putOpNode(icall, x, null);
+  return putOpNode(icall, x, type);
 }
 
 
-void ioCall(Node x, Node y)
+Node ioCall(Node x, Node y)
 {
   Node z;
 
   if (x.val < 3) testInt(y);
   if (x.val == 1) {
     y = unbox(y);
-    putOpNode(icount, y, null);
+    return putOpNode(icount, y, null);
   } else if (x.val == 2) {
     y = unbox(y);
-    putOpNode(iwrite, y, null);
+    return putOpNode(iwrite, y, null);
   } else {
-    putOp(iwrl, null);
+    return putOp(iwrl, null);
   }
 }
 
@@ -709,6 +727,14 @@ void ret(int size)
   putOpNode(iret, x, null);
 }
 
+void retv(int size, Node val, TypeDesc desc) {
+  /* The size of formal parameters, shows how much to unwind the stack */
+  Node x = new Node();
+  makeConstNodeDesc(x, intType, size);
+  val = convert(val, desc);
+  putOpNodeNode(iretv, x, val, desc);
+
+}
 
 void open()
 {
@@ -795,6 +821,7 @@ void decode()
       case icheckbounds:
       case ichecktype:
       case ilddynamic:
+      case iretv:
         printNode(i.x);
         printNode(i.y);
         assert(i.z == null);

@@ -1,4 +1,5 @@
 //test array and struct
+
 import 'stdio.dart';
 
 class A {
@@ -6,28 +7,23 @@ class A {
   var next;
 }
 
-var tmp;
-var total;
-
-void init(var count) {
+dynamic init(var count) {
   var a;
   if (count <= 0) {
-    tmp = null;
+    a = null;
   } else {
-    init(count - 1);
     a = new A();
     a.value = count;
-    a.next = tmp;
-    tmp = a;
+    a.next = init(count - 1);
   }
+  return a;
 }
 
-void sum(var a) {
+dynamic sum(var a) {
   if (a == null) {
-    total = 0;
+    return 0;
   } else {
-    sum(a.next);
-    total = total + a.value;
+    return sum(a.next) + a.value;
   }
 }
 
@@ -35,10 +31,8 @@ void main()
 {
   var a;
 
-  init(10);
-  a = tmp;
-  sum(a);
-  WriteLong(total);
+  a = init(10);
+  WriteLong(sum(a));
   WriteLine();
 }
 
