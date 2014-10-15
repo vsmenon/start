@@ -92,7 +92,9 @@ bool isSubType(TypeMirror t1, TypeMirror t2) {
   if (t1.reflectedType == Object)
     return false;
 
-  // How do we handle dynamic?
+  // How do we handle dynamic?  In Dart, dynamic subtypes everything.
+  // This is somewhat counterintuitive - subtyping usually narrows.
+  // Here we treat dynamic essentially as Object.
   if (t1.reflectedType == dynamic)
     return false;
   if (t2.reflectedType == dynamic)
@@ -254,7 +256,9 @@ void main() {
   test(cc, aatype, dart: false, start: false);
   test(cc, bbtype, dart: true, start: true);
 
-  // Functions.
+  // Functions
+  // - return type: Dart is bivariant.  This is covariant.
+  // - param types: Dart is bivariant.  This is contravariant.
   test(bar1, Foo, dart: true, start: false);
   test(bar2, Foo, dart: true, start: false);
   test(bar3, Foo, dart: true, start: true);
