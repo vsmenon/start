@@ -3,7 +3,7 @@
 
 library stdio;
 
-var _buffer = new StringBuffer();
+StringBuffer _buffer = new StringBuffer();
 
 void _printf(String str) {
   final list = str.split('\n');
