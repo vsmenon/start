@@ -67,6 +67,15 @@ class DartRules extends TypeRules {
 class StartRules extends TypeRules {
   StartRules(TypeProvider provider) : super(provider);
 
+  bool isDynamic(DartType t) {
+    // Erasure
+    if (t is TypeParameterType)
+      return true;
+    if (t.isDartCoreFunction)
+      return true;
+    return t == provider.dynamicType;
+  }
+
   bool isPrimitive(DartType t) {
     // FIXME: Handle VoidType here?
     if (t == provider.intType || t == provider.doubleType || t == provider.boolType)
@@ -124,9 +133,9 @@ class StartRules extends TypeRules {
     return true;
   }
 
-  bool isClassSubTypeOf(InterfaceType i1, InterfaceType i2) {
+  bool isInterfaceSubTypeOf(InterfaceType i1, InterfaceType i2) {
     // FIXME: Verify this!
-    // Note: this essentially imposes invariance on generics
+    // Note: this essentially applies erasure on generics
     // instead of Dart's covariance.
 
     if (i1 == i2)
@@ -139,11 +148,16 @@ class StartRules extends TypeRules {
     if (i1 == provider.objectType)
       return false;
 
-    if (isClassSubTypeOf(i1.superclass, i2))
+    if (isInterfaceSubTypeOf(i1.superclass, i2))
       return true;
 
     for (final parent in i1.interfaces) {
-      if (isClassSubTypeOf(parent, i2))
+      if (isInterfaceSubTypeOf(parent, i2))
+        return true;
+    }
+
+    for (final parent in i1.mixins) {
+      if (isInterfaceSubTypeOf(parent, i2))
         return true;
     }
 
@@ -151,13 +165,18 @@ class StartRules extends TypeRules {
   }
 
   bool isSubTypeOf(DartType t1, DartType t2) {
-    if (t1 == t2)
-      return true;
-
     // Primitives are standalone types.  Unless boxed, they do not subtype
     // Object and are not subtyped by dynamic.
     if (isPrimitive(t1) || isPrimitive(t2))
       return isPrimitiveEquals(t1, t2);
+
+    if (t1 is TypeParameterType)
+      t1 = provider.dynamicType;
+    if (t2 is TypeParameterType)
+      t2 = provider.dynamicType;
+
+    if (t1 == t2)
+      return true;
 
     // Null can be assigned to anything else.
     // FIXME: Can this be anything besides null?
@@ -169,22 +188,22 @@ class StartRules extends TypeRules {
       return true;
 
     // Trivially false.
-    if (t1 == provider.objectType)
+    if (t1 == provider.objectType && t2 != provider.dynamicType)
       return false;
 
     // How do we handle dynamic?  In Dart, dynamic subtypes everything.
     // This is somewhat counterintuitive - subtyping usually narrows.
     // Here we treat dynamic essentially as Object.
-    if (t1 == provider.dynamicType)
+    if (isDynamic(t1))
       return false;
-    if (t2 == provider.dynamicType)
+    if (isDynamic(t2))
       return true;
 
     // "Traditional" name-based subtype check.
     // FIXME: What happens with classes that implement Function?
     // Are typedefs handled correctly?
     if (t1 is InterfaceType && t2 is InterfaceType) {
-      if (isClassSubTypeOf(t1, t2)) {
+      if (isInterfaceSubTypeOf(t1, t2)) {
         return true;
       }
     }
@@ -219,25 +238,33 @@ class StartRules extends TypeRules {
   }
 
   bool checkAssignment(Expression expr, DartType type) {
-    final staticType = expr.staticType;
-    if (!isAssignable(staticType, type)) {
-      if (staticType == provider.dynamicType && isPrimitive(type)) {
-        print('AUTO: $expr ($staticType) must be unboxed to type $type');
-      } else if (staticType == provider.dynamicType) {
-        print('AUTO: $expr ($staticType) will need runtime check for type $type');
-      } else if (type == provider.dynamicType && isPrimitive(staticType)) {
-        print('AUTO: $expr ($staticType) must be boxed');
-      } else if (isSubTypeOf(type, staticType)) {
-        print('AUTO: $expr ($staticType) will need runtime check to cast to type $type');
-      } else if (isPrimitive(staticType) && isPrimitive(type)) {
-        print('AUTO: $expr ($staticType) should be converted to type $type');
+    final exprType = expr.staticType;
+    if (!isAssignable(exprType, type)) {
+      if (isDynamic(exprType) && isPrimitive(type)) {
+        print('  AUTO: $expr ($exprType) must be unboxed to type $type');
+      } else if (isDynamic(exprType)) {
+        print('  AUTO: $expr ($exprType) will need runtime check for type $type');
+      } else if ((isDynamic(type) || type == provider.objectType) && isPrimitive(exprType)) {
+        print('  AUTO: $expr ($exprType) must be boxed');
+      } else if (isSubTypeOf(type, exprType)) {
+        print('  AUTO: $expr ($exprType) will need runtime check to cast to type $type');
+      } else if (isPrimitive(exprType) && isPrimitive(type)) {
+        print('  AUTO: $expr ($exprType) should be converted to type $type');
       } else {
-        print('ERROR: Type check failed: $expr (${expr.staticType}) is not of type $type');
+        String kind = (exprType is FunctionType || type is FunctionType) ? 'of function' : 'of expression';
+        print('ERROR: Type check $kind failed: $expr ($exprType) is not of type $type');
       }
       return false;
     }
     return true;
   }
+}
+
+class WorkListItem {
+  final Uri uri;
+  final Source source;
+  final bool isLibrary;
+  WorkListItem(this.uri, this.source, this.isLibrary);
 }
 
 class ProgramChecker extends RecursiveAstVisitor {
@@ -247,6 +274,8 @@ class ProgramChecker extends RecursiveAstVisitor {
   final Map<Uri, CompilationUnit> _unitMap;
   final Map<Uri, Library> _libraries;
   final List<Library> _stack;
+  final List<WorkListItem> workList = [];
+  final List<WorkListItem> partWorkList = [];
 
   Uri toUri(String string) {
     // FIXME: Use analyzer's resolver logic.
@@ -259,8 +288,14 @@ class ProgramChecker extends RecursiveAstVisitor {
     }
   }
 
+  void add(Uri uri, Source source, bool isLibrary) {
+    if (isLibrary)
+      workList.add(new WorkListItem(uri, source, isLibrary));
+    else
+      partWorkList.add(new WorkListItem(uri, source, isLibrary));
+  }
+
   CompilationUnit load(Uri uri, Source source, bool isLibrary) {
-    // print('loading $uri');
     if (uri.scheme == 'dart') {
       // print('skipping $uri');
       return null;
@@ -269,6 +304,7 @@ class ProgramChecker extends RecursiveAstVisitor {
       assert(isLibrary);
       return _unitMap[uri];
     }
+    print(' loading $uri');
     final unit = getCompilationUnit(source, isLibrary);
     _unitMap[uri] = unit;
     if (isLibrary) {
@@ -283,6 +319,11 @@ class ProgramChecker extends RecursiveAstVisitor {
     }
     unit.visitChildren(this);
     if (isLibrary) {
+      while (partWorkList.isNotEmpty) {
+        WorkListItem item = partWorkList.removeAt(0);
+        assert(!item.isLibrary);
+        load(item.uri, item.source, item.isLibrary);
+      }
       final last = _stack.removeLast();
       assert(last.uri == uri);
     }
@@ -293,7 +334,7 @@ class ProgramChecker extends RecursiveAstVisitor {
     String content = directive.uri.stringValue;
     Uri uri = toUri(content);
     Source source = directive.source;
-    load(uri, source, isLibrary);
+    add(uri, source, isLibrary);
   }
 
   CompilationUnit getCompilationUnit(Source source, bool isLibrary) {
@@ -305,7 +346,15 @@ class ProgramChecker extends RecursiveAstVisitor {
       : _unitMap = new Map<Uri, CompilationUnit>()
       , _libraries = new Map<Uri, Library>()
       , _stack = new List<Library>() {
-    load(_root, source, true);
+    add(_root, source, true);
+  }
+
+  void check() {
+    while (workList.isNotEmpty) {
+      WorkListItem item = workList.removeAt(0);
+      assert(item.isLibrary);
+      load(item.uri, item.source, item.isLibrary);
+    }
   }
 
   AstNode visitExportDirective(ExportDirective node) {
@@ -336,6 +385,42 @@ class ProgramChecker extends RecursiveAstVisitor {
   AstNode visitAssignmentExpression(AssignmentExpression node) {
     DartType staticType = node.leftHandSide.staticType;
     checkAssignment(node.rightHandSide, staticType);
+    node.visitChildren(this);
+    return node;
+  }
+
+  bool checkArgumentList(ArgumentList node) {
+    NodeList<Expression> list = node.arguments;
+     for (Expression arg in list) {
+       ParameterElement element = node.getStaticParameterElementFor(arg);
+       if (element == null) {
+         return false;
+         print('ERROR: dynamic invoke for $node');
+         continue;
+       }
+       DartType expectedType = element.type;
+       if (expectedType == null)
+         expectedType = _rules.provider.dynamicType;
+       checkAssignment(arg, expectedType);
+     }
+     return true;
+  }
+
+  AstNode visitMethodInvocation(MethodInvocation node) {
+    bool checked = checkArgumentList(node.argumentList);
+    if (!checked) {
+      print('WARNING: dynamic invoke required for: $node');
+    }
+    node.visitChildren(this);
+    return node;
+  }
+
+  AstNode visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
+    bool checked = checkArgumentList(node.argumentList);
+    if (!checked) {
+      print('WARNING: dynamic invoke required for: $node');
+    }
+    node.visitChildren(this);
     return node;
   }
 
@@ -349,6 +434,7 @@ class ProgramChecker extends RecursiveAstVisitor {
       if (initializer != null)
         checkAssignment(initializer, dartType);
     }
+    node.visitChildren(this);
     return node;
   }
 
@@ -386,5 +472,8 @@ void main(List argv)
 
   final uri = new Uri.file(filename);
   final visitor = new ProgramChecker(context, new StartRules(provider), uri, source);
+  visitor.check();
   print('done');
 }
+
+
