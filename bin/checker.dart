@@ -9,8 +9,12 @@ import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:logging/logging.dart' as logger;
+import 'typewalker.dart';
 
 final parser = new ArgParser();
+
+final log = new logger.Logger('checker');
 
 ArgResults options(List argv) {
   parser.addFlag('compile', abbr: 'c', help: 'Compile only', defaultsTo: false);
@@ -41,6 +45,13 @@ abstract class TypeRules {
   bool isAssignable(DartType t1, DartType t2);
 
   bool checkAssignment(Expression expr, DartType t);
+
+  void setCompilationUnit(CompilationUnit unit) {}
+
+  DartType getStaticType(Expression expr) => expr.staticType;
+
+  DartType mapGenericType(DartType type);
+  DartType elementType(Element e);
 }
 
 class DartRules extends TypeRules {
@@ -54,18 +65,45 @@ class DartRules extends TypeRules {
     return t1.isAssignableTo(t2);
   }
 
-  bool checkAssignment(Expression expr, DartType type) {
-    final staticType = expr.staticType;
-    if (!isAssignable(staticType, type)) {
-      print('Type check failed: $expr (${expr.staticType}) is not of type $type');
+  bool checkAssignment(Expression expr, DartType toType) {
+    final fromType = getStaticType(expr);
+    if (!isAssignable(fromType, toType)) {
+      // print('Type check failed: $expr ($fromType) is not of type $toType');
       return false;
     }
     return true;
   }
+
+  DartType mapGenericType(DartType type) => type;
+
+  DartType elementType(Element e) {
+    return (e as dynamic).type;
+  }
 }
 
 class StartRules extends TypeRules {
+  // If true, num is treated as a synonym for double.
+  // If false, num is always boxed.
+  static const bool primitiveNum = false;
+  StartTypeWalker _typeWalker = null;
+  LibraryElement _current = null;
+
   StartRules(TypeProvider provider) : super(provider);
+
+  void setCompilationUnit(CompilationUnit unit) {
+    LibraryElement lib = unit.element.enclosingElement;
+    if (lib != _current) {
+      _current = lib;
+      _typeWalker = new StartTypeWalker(provider, _current);
+      unit.visitChildren(_typeWalker);
+    }
+  }
+
+  // FIXME: Don't use Dart's static type propagation rules.
+  DartType getStaticType(Expression expr) {
+    return _typeWalker.getStaticType(expr);
+    //return super.getStaticType(expr);
+  }
 
   bool isDynamic(DartType t) {
     // Erasure
@@ -73,32 +111,83 @@ class StartRules extends TypeRules {
       return true;
     if (t.isDartCoreFunction)
       return true;
-    return t == provider.dynamicType;
+    return t.isDynamic;
+  }
+
+  bool canBeBoxedTo(DartType primitiveType, DartType boxedType) {
+    assert(isPrimitive(primitiveType));
+    // Any primitive can be boxed to Object or dynamic.
+    if (boxedType.isObject || boxedType.isDynamic || boxedType is TypeParameterType)
+      return true;
+    // True iff a location with this type may be assigned a boxed
+    // int or double.
+    if (primitiveType != provider.boolType)
+      if (!primitiveNum && boxedType.name == "num")
+        return true;
+    return false;
   }
 
   bool isPrimitive(DartType t) {
     // FIXME: Handle VoidType here?
+    if (t.name == "void")
+      return true;
     if (t == provider.intType || t == provider.doubleType || t == provider.boolType)
       return true;
-    if (t.name == "num")
+    if (primitiveNum && t.name == "num")
       return true;
     return false;
   }
 
   bool isPrimitiveEquals(DartType t1, DartType t2) {
     assert(isPrimitive(t1) || isPrimitive(t2));
-    t1 = (t1.name == "num") ? provider.doubleType : t1;
-    t2 = (t2.name == "num") ? provider.doubleType : t2;
+    if (primitiveNum) {
+      t1 = (t1.name == "num") ? provider.doubleType : t1;
+      t2 = (t2.name == "num") ? provider.doubleType : t2;
+    }
     return t1 == t2;
   }
 
-  bool isFunctionSubTypeOf(FunctionType f1, FunctionType f2) {
+  bool isWrappableFunctionType(FunctionType f1, FunctionType f2) {
+    // Can f1 be wrapped into an f2?
+    assert(!isFunctionSubTypeOf(f1, f2));
+    return isFunctionSubTypeOf(f1, f2, true);
+  }
+
+  bool canAutoConvertTo(DartType t1, DartType t2) {
+    // TODO(vsm): Factor out common logic with error reporting below.
+    if (isPrimitive(t2) && canBeBoxedTo(t2, t1)) {
+      // Unbox
+      return true;
+    } else if (isDynamic(t1)) {
+      // Type check
+      return true;
+    } else if (isPrimitive(t1) && canBeBoxedTo(t1, t2)) {
+      // Box
+      return true;
+    } else if (isSubTypeOf(t2, t1)) {
+      // Down cast
+      // return true;
+      return false;
+    } else if (isPrimitive(t1) && isPrimitive(t2)) {
+      // Primitive conversion
+      return true;
+    }
+    return false;
+  }
+
+  bool isFunctionSubTypeOf(FunctionType f1, FunctionType f2, [bool wrap = false]) {
     final params1 = f1.parameters;
     final params2 = f2.parameters;
     final ret1 = f1.returnType;
     final ret2 = f2.returnType;
 
-    if (!isSubTypeOf(ret1, ret2)) {
+    // TODO(vsm): Factor this out.  If ret1 can be auto-converted to ret2:
+    //  - primitive conversion
+    //  - box
+    //  - unbox
+    //  - cast to dynamic
+    //  - cast from dynamic
+    if (!isSubTypeOf(ret1, ret2) && !(wrap && canAutoConvertTo(ret1, ret2))) {
       // Covariant return types.
       return false;
     }
@@ -112,7 +201,7 @@ class StartRules extends TypeRules {
       ParameterElement p2 = params2[i];
 
       // Contravariant parameter types.
-      if (!isSubTypeOf(p2.type, p1.type))
+      if (!isSubTypeOf(p2.type, p1.type) && !(wrap && canAutoConvertTo(p2.type, p1.type)))
         return false;
 
       // If the base param is optional, the sub param must be optional:
@@ -238,25 +327,43 @@ class StartRules extends TypeRules {
   }
 
   bool checkAssignment(Expression expr, DartType type) {
-    final exprType = expr.staticType;
+    final exprType = getStaticType(expr);
     if (!isAssignable(exprType, type)) {
-      if (isDynamic(exprType) && isPrimitive(type)) {
-        print('  AUTO: $expr ($exprType) must be unboxed to type $type');
+      if (isPrimitive(type) && canBeBoxedTo(type, exprType)) {
+        log.info('$expr ($exprType) must be unboxed to type $type');
       } else if (isDynamic(exprType)) {
-        print('  AUTO: $expr ($exprType) will need runtime check for type $type');
-      } else if ((isDynamic(type) || type == provider.objectType) && isPrimitive(exprType)) {
-        print('  AUTO: $expr ($exprType) must be boxed');
+        log.info('$expr ($exprType) will need runtime check for type $type');
+      } else if (isPrimitive(exprType) && canBeBoxedTo(exprType, type)) {
+        log.info('$expr ($exprType) must be boxed');
       } else if (isSubTypeOf(type, exprType)) {
-        print('  AUTO: $expr ($exprType) will need runtime check to cast to type $type');
+        var kind = 'AUTO';
+        if (type is FunctionType) {
+          kind = 'AUTO_FUNCTION';
+          final message = 'FUNCTION AUTO? $exprType to $type';
+          // print(message);
+        }
+        log.info('$kind: $expr ($exprType) will need runtime check to cast to type $type');
       } else if (isPrimitive(exprType) && isPrimitive(type)) {
-        print('  AUTO: $expr ($exprType) should be converted to type $type');
+        log.info('$expr ($exprType) should be converted to type $type');
       } else {
-        String kind = (exprType is FunctionType || type is FunctionType) ? 'of function' : 'of expression';
-        print('ERROR: Type check $kind failed: $expr ($exprType) is not of type $type');
+        if (exprType is FunctionType && type is FunctionType && isWrappableFunctionType(exprType, type)) {
+          log.warning('(WRAPPED_FUNCTION): $expr ($exprType) to type $type');
+        } else {
+          String kind = (exprType is FunctionType || type is FunctionType) ? 'of function' : 'of expression';
+          log.severe('Type check $kind failed: $expr ($exprType) is not of type $type', expr);
+        }
       }
       return false;
     }
     return true;
+  }
+
+  DartType mapGenericType(DartType type) {
+    return _typeWalker.dynamize(type);
+  }
+
+  DartType elementType(Element e) {
+    return _typeWalker.baseElementType(e);
   }
 }
 
@@ -265,6 +372,18 @@ class WorkListItem {
   final Source source;
   final bool isLibrary;
   WorkListItem(this.uri, this.source, this.isLibrary);
+}
+
+class InvalidOverride {
+  final MethodDeclaration method;
+  final InterfaceType base;
+  final FunctionType methodType;
+  final FunctionType baseType;
+
+  InvalidOverride(this.method, this.base, this.methodType, this.baseType);
+
+  ClassDeclaration get parent => method.parent as ClassDeclaration;
+  String toString() => 'Invalid override for ${method.name} in ${parent.name} over $base: $methodType does not subtype $baseType';
 }
 
 class ProgramChecker extends RecursiveAstVisitor {
@@ -276,6 +395,8 @@ class ProgramChecker extends RecursiveAstVisitor {
   final List<Library> _stack;
   final List<WorkListItem> workList = [];
   final List<WorkListItem> partWorkList = [];
+
+  Uri _uri = null;
 
   Uri toUri(String string) {
     // FIXME: Use analyzer's resolver logic.
@@ -304,8 +425,10 @@ class ProgramChecker extends RecursiveAstVisitor {
       assert(isLibrary);
       return _unitMap[uri];
     }
-    print(' loading $uri');
+    // print(' loading $uri');
+    _uri = uri;
     final unit = getCompilationUnit(source, isLibrary);
+    _rules.setCompilationUnit(unit);
     _unitMap[uri] = unit;
     if (isLibrary) {
       assert(!_libraries.containsKey(uri));
@@ -383,22 +506,107 @@ class ProgramChecker extends RecursiveAstVisitor {
   }
 
   AstNode visitAssignmentExpression(AssignmentExpression node) {
-    DartType staticType = node.leftHandSide.staticType;
+    DartType staticType = _rules.getStaticType(node.leftHandSide);
     checkAssignment(node.rightHandSide, staticType);
     node.visitChildren(this);
     return node;
   }
 
+
+  // Check that member declarations soundly override any overridden declarations.
+  InvalidOverride findInvalidOverride(MethodDeclaration node, InterfaceType type) {
+    // FIXME: This can be done a lot more efficiently.
+    assert(!node.isStatic);
+
+    // TODO(vsm): Generic
+    var element = node.element;
+    FunctionType subType = _rules.elementType(node.element);
+
+    ExecutableElement baseMethod;
+    String memberName = node.name.name;
+
+    if (node.isGetter) {
+      assert(!node.isSetter);
+      // Look for getter or field.
+      // FIXME: Verify that this handles fields.
+      baseMethod = type.getGetter(memberName);
+    } else if (node.isSetter) {
+      baseMethod = type.getSetter(memberName);
+    } else {
+      if (memberName == '-') {
+        // operator- can be overloaded!
+        final len = subType.parameters.length;
+        for (final method in type.methods) {
+          if (method.name == memberName && method.parameters.length == len) {
+            baseMethod = method;
+            break;
+          }
+        }
+      } else {
+        baseMethod = type.getMethod(memberName);
+      }
+    }
+    if (baseMethod != null) {
+      // TODO(vsm): Test for generic
+      FunctionType baseType = _rules.elementType(baseMethod);
+      if (!_rules.isAssignable(subType, baseType))
+        return new InvalidOverride(node, type, subType, baseType);
+    }
+
+    if (type.isObject)
+      return null;
+
+    InvalidOverride base = findInvalidOverride(node, type.superclass);
+    if (base != null)
+      return base;
+
+    for (final parent in type.interfaces) {
+      base = findInvalidOverride(node, parent);
+      if (base != null)
+        return base;
+    }
+
+    for (final parent in type.mixins) {
+      base = findInvalidOverride(node, parent);
+      if (base != null)
+        return base;
+    }
+
+    return null;
+  }
+
+  AstNode visitMethodDeclaration(MethodDeclaration node) {
+    node.visitChildren(this);
+    if (node.isStatic) return node;
+    final parent = node.parent;
+    if (parent is! ClassDeclaration) {
+      throw 'Unexpected parent: $parent';
+    }
+    ClassDeclaration cls = parent as ClassDeclaration;
+    // TODO(vsm): Check for generic.
+    InterfaceType type = _rules.elementType(cls.element);
+    InvalidOverride invalid = findInvalidOverride(node, type);
+    if (invalid != null) {
+      log.severe('$invalid', node);
+    }
+    return node;
+  }
+
+  AstNode visitFieldDeclaration(FieldDeclaration node) {
+    // FIXME: Is there always a corresponding synthetic method?  If not, we need to validate here.
+    node.visitChildren(this);
+    return node;
+  }
+
+  // Check invocations
   bool checkArgumentList(ArgumentList node) {
     NodeList<Expression> list = node.arguments;
      for (Expression arg in list) {
        ParameterElement element = node.getStaticParameterElementFor(arg);
        if (element == null) {
          return false;
-         print('ERROR: dynamic invoke for $node');
-         continue;
        }
-       DartType expectedType = element.type;
+       DartType expectedType = _rules.mapGenericType(_rules.elementType(element));
        if (expectedType == null)
          expectedType = _rules.provider.dynamicType;
        checkAssignment(arg, expectedType);
@@ -409,7 +617,7 @@ class ProgramChecker extends RecursiveAstVisitor {
   AstNode visitMethodInvocation(MethodInvocation node) {
     bool checked = checkArgumentList(node.argumentList);
     if (!checked) {
-      print('WARNING: dynamic invoke required for: $node');
+      log.warning('dynamic invoke required for: $node');
     }
     node.visitChildren(this);
     return node;
@@ -418,7 +626,25 @@ class ProgramChecker extends RecursiveAstVisitor {
   AstNode visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
     bool checked = checkArgumentList(node.argumentList);
     if (!checked) {
-      print('WARNING: dynamic invoke required for: $node');
+      log.warning('dynamic invoke required for: $node');
+    }
+    node.visitChildren(this);
+    return node;
+  }
+
+  AstNode visitRedirectingConstructorInvocation(RedirectingConstructorInvocation node) {
+    bool checked = checkArgumentList(node.argumentList);
+    if (!checked) {
+      log.warning('dynamic invoke required for: $node');
+    }
+    node.visitChildren(this);
+    return node;
+  }
+
+  AstNode visitSuperConstructorInvocation(SuperConstructorInvocation node) {
+    bool checked = checkArgumentList(node.argumentList);
+    if (!checked) {
+      log.warning('dynamic invoke required for: $node');
     }
     node.visitChildren(this);
     return node;
@@ -449,6 +675,19 @@ class ProgramChecker extends RecursiveAstVisitor {
 
 void main(List argv)
 {
+  // Configure logger
+  logger.Logger.root.level = logger.Level.SEVERE;
+  logger.Logger.root.onRecord.listen((logger.LogRecord rec) {
+    AstNode node = rec.error;
+    var pos = '';
+    if (node != null) {
+      final root = node.root as CompilationUnit;
+      final info = root.lineInfo.getLocation(node.beginToken.offset);
+      pos = ' ${root.element}:${info.lineNumber}:${info.columnNumber}';
+    }
+    print('${rec.level.name}$pos: ${rec.message}');
+  });
+
   int exitCode = 0;
   CommandLineOptions options = CommandLineOptions.parse(argv);
 
@@ -464,16 +703,17 @@ void main(List argv)
     exitCode = errorSeverity.ordinal;
   }
   if (exitCode != 0)
-    print('error');
+    log.severe('error');
 
   AnalysisContext context = analyzer.context;
   TypeProvider provider = (context as AnalysisContextImpl).typeProvider;
+
   final source = analyzer.librarySource;
 
   final uri = new Uri.file(filename);
   final visitor = new ProgramChecker(context, new StartRules(provider), uri, source);
   visitor.check();
-  print('done');
+  log.info('done');
 }
 
 
