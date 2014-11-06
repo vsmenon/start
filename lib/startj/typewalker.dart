@@ -1097,4 +1097,12 @@ class StartTypeWalker extends SimpleAstVisitor {
     assert(type != null);
     return dynamize(type);
   }
+
+  void _setVariableType(VariableDeclaration node, DartType type) {
+  }
+
+  DartType variableType(VariableDeclaration node) {
+    VariableDeclarationList list = node.parent;
+    return _getType(list.type);
+  }
 }

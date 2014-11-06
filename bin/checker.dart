@@ -11,6 +11,7 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/resolver.dart';
 import 'package:logging/logging.dart' as logger;
 
+import 'package:start/startj/codegenerator.dart';
 import 'package:start/startj/typechecker.dart';
 
 final parser = new ArgParser();
@@ -19,7 +20,30 @@ ArgResults parse(List argv) {
   parser.addFlag('type-check', abbr: 't', help: 'Typecheck only', defaultsTo: false);
   parser.addOption('log', abbr: 'l', help: 'Logging level', defaultsTo: 'severe');
   parser.addOption('dart-sdk', help: 'Dart SDK Path', defaultsTo: null);
+  parser.addOption('out', abbr: 'o', help: 'Output directory', defaultsTo: null);
   return parser.parse(argv);
+}
+
+String findSdk() {
+  // Find the SDK from the Platform.
+  String dart = Platform.executable;
+  const dartExec = 'bin/dart';
+  if (dart.endsWith(dartExec)) {
+    return dart.substring(0, dart.length - dartExec.length);
+  }
+  if (dart == 'dart') {
+    // Check if dart is on the path.
+    final path = Platform.environment['PATH'];
+    List<String> dirs = path.split(':');
+    for (final dir in dirs) {
+      if (dir.endsWith('/bin')) {
+        final file = new File('$dir/$dart');
+        if (file.existsSync())
+          return file.parent.parent.path;
+      }
+    }
+  }
+  return null;
 }
 
 void main(List argv) {
@@ -28,12 +52,18 @@ void main(List argv) {
   String dartPath = Platform.executable;
   const dartExec = 'bin/dart';
   String dartSdk = args['dart-sdk'];
-  if (dartSdk == null && dartPath.endsWith(dartExec)) {
-    dartSdk = dartPath.substring(0, dartPath.length - dartExec.length);
+  if (dartSdk == null) {
+    dartSdk = findSdk();
+    if (dartSdk == null) {
+      // TODO(vsm): Search path.
+      print('Could not automatically find dart sdk path.');
+      print('Please pass in explicitly: --dart-sdk <path>');
+      return;
+    }
   }
 
   // Pass the remaining options to the analyzer.
-  final analyzerArgv = ['--dart-sdk', dartSdk];
+  final analyzerArgv = ['--dart-sdk', dartSdk, '--no-hints'];
   analyzerArgv.addAll(args.rest);
   CommandLineOptions options = CommandLineOptions.parse(analyzerArgv);
 
@@ -67,8 +97,10 @@ void main(List argv) {
   if (options.warningsAreFatal && errorSeverity == ErrorSeverity.WARNING) {
     exitCode = errorSeverity.ordinal;
   }
-  if (exitCode != 0)
+  if (exitCode != 0) {
     log.severe('error');
+    return;
+  }
 
   // Invoke the checker on the entry point.
   AnalysisContext context = analyzer.context;
@@ -77,6 +109,15 @@ void main(List argv) {
   final uri = new Uri.file(filename);
   final visitor = new ProgramChecker(context, new StartRules(provider), uri, source);
   visitor.check();
+  visitor.finalizeImports();
+
+  // Generate code.
+  if (args['out'] != null) {
+    String outDir = args['out'];
+    final cg = new CodeGenerator(outDir, uri, visitor.libraries);
+    cg.generate();
+  }
+
   log.shout('done');
 }
 

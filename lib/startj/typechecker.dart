@@ -17,6 +17,7 @@ class Library {
   final Source source;
   final CompilationUnit lib;
   final Map<Uri, CompilationUnit> parts = new Map<Uri, CompilationUnit>();
+  final Map<Uri, Library> imports = new Map<Uri, Library>();
 
   Library(this.uri, this.source, this.lib);
 }
@@ -364,15 +365,21 @@ class WorkListItem {
 }
 
 class InvalidOverride {
-  final MethodDeclaration method;
+  final ExecutableElement element;
   final InterfaceType base;
   final FunctionType methodType;
   final FunctionType baseType;
+  final bool fieldOverride;
 
-  InvalidOverride(this.method, this.base, this.methodType, this.baseType);
+  InvalidOverride(this.element, this.base, this.methodType, this.baseType, [this.fieldOverride = false]);
 
-  ClassDeclaration get parent => method.parent as ClassDeclaration;
-  String toString() => 'Invalid override for ${method.name} in ${parent.name} over $base: $methodType does not subtype $baseType';
+  ClassDeclaration get parent => element.enclosingElement.node as ClassDeclaration;
+  String toString() {
+    if (fieldOverride)
+      return 'Invalid field override for ${element.name} in ${parent.name} over $base';
+    else
+      return 'Invalid override for ${element.name} in ${parent.name} over $base: $methodType does not subtype $baseType';
+  }
 }
 
 class ProgramChecker extends RecursiveAstVisitor {
@@ -380,7 +387,7 @@ class ProgramChecker extends RecursiveAstVisitor {
   final TypeRules _rules;
   final Uri _root;
   final Map<Uri, CompilationUnit> _unitMap;
-  final Map<Uri, Library> _libraries;
+  final Map<Uri, Library> libraries;
   final List<Library> _stack;
   final List<WorkListItem> workList = [];
   final List<WorkListItem> partWorkList = [];
@@ -399,10 +406,24 @@ class ProgramChecker extends RecursiveAstVisitor {
   }
 
   void add(Uri uri, Source source, bool isLibrary) {
-    if (isLibrary)
+    if (isLibrary) {
       workList.add(new WorkListItem(uri, source, isLibrary));
-    else
+      if (_stack.isNotEmpty) {
+        // This is an import / export.
+        // Record the key.  Fill in the library later.
+        Library lib = _stack.last;
+        lib.imports[uri] = null;
+      }
+    } else {
       partWorkList.add(new WorkListItem(uri, source, isLibrary));
+    }
+  }
+
+  void finalizeImports() {
+    libraries.forEach((Uri uri, Library lib) {
+      for (Uri key in lib.imports.keys)
+        lib.imports[key] = libraries[key];
+    });
   }
 
   CompilationUnit load(Uri uri, Source source, bool isLibrary) {
@@ -420,9 +441,9 @@ class ProgramChecker extends RecursiveAstVisitor {
     _rules.setCompilationUnit(unit);
     _unitMap[uri] = unit;
     if (isLibrary) {
-      assert(!_libraries.containsKey(uri));
+      assert(!libraries.containsKey(uri));
       Library lib = new Library(uri, source, unit);
-      _libraries[uri] = lib;
+      libraries[uri] = lib;
       _stack.add(lib);
     } else {
       Library lib = _stack.last;
@@ -456,7 +477,7 @@ class ProgramChecker extends RecursiveAstVisitor {
 
   ProgramChecker(this._context, this._rules, this._root, Source source)
       : _unitMap = new Map<Uri, CompilationUnit>()
-      , _libraries = new Map<Uri, Library>()
+      , libraries = new Map<Uri, Library>()
       , _stack = new List<Library>() {
     add(_root, source, true);
   }
@@ -501,25 +522,27 @@ class ProgramChecker extends RecursiveAstVisitor {
     return node;
   }
 
-
   // Check that member declarations soundly override any overridden declarations.
-  InvalidOverride findInvalidOverride(MethodDeclaration node, InterfaceType type) {
+  InvalidOverride findInvalidOverride(ExecutableElement element, InterfaceType type, [bool allowFieldOverride = null]) {
     // FIXME: This can be done a lot more efficiently.
-    assert(!node.isStatic);
+    assert(!element.isStatic);
 
-    // TODO(vsm): Generic
-    var element = node.element;
-    FunctionType subType = _rules.elementType(node.element);
+    // TODO(vsm): Move this out.
+    FunctionType subType = _rules.elementType(element);
 
     ExecutableElement baseMethod;
-    String memberName = node.name.name;
+    String memberName = element.name;
 
-    if (node.isGetter) {
-      assert(!node.isSetter);
+    final isGetter = element is PropertyAccessorElement && element.isGetter;
+    final isSetter = element is PropertyAccessorElement && element.isSetter;
+
+    int kind;
+    if (isGetter) {
+      assert(!isSetter);
       // Look for getter or field.
       // FIXME: Verify that this handles fields.
       baseMethod = type.getGetter(memberName);
-    } else if (node.isSetter) {
+    } else if (isSetter) {
       baseMethod = type.getSetter(memberName);
     } else {
       if (memberName == '-') {
@@ -539,29 +562,48 @@ class ProgramChecker extends RecursiveAstVisitor {
       // TODO(vsm): Test for generic
       FunctionType baseType = _rules.elementType(baseMethod);
       if (!_rules.isAssignable(subType, baseType))
-        return new InvalidOverride(node, type, subType, baseType);
+        return new InvalidOverride(element, type, subType, baseType);
+
+      // Test that we're not overriding a field.
+      if (allowFieldOverride == false) {
+        for (FieldElement field in type.element.fields) {
+          if (field.name == memberName) {
+            // TODO(vsm): Is this the right test?
+            bool syn = field.isSynthetic;
+            if (!syn)
+              return new InvalidOverride(element, type, subType, baseType, true);
+          }
+        }
+      }
     }
 
     if (type.isObject)
       return null;
 
-    InvalidOverride base = findInvalidOverride(node, type.superclass);
+    allowFieldOverride = allowFieldOverride == null ? false : allowFieldOverride;
+    InvalidOverride base = findInvalidOverride(element, type.superclass, allowFieldOverride);
     if (base != null)
       return base;
 
     for (final parent in type.interfaces) {
-      base = findInvalidOverride(node, parent);
+      base = findInvalidOverride(element, parent, true);
       if (base != null)
         return base;
     }
 
     for (final parent in type.mixins) {
-      base = findInvalidOverride(node, parent);
+      base = findInvalidOverride(element, parent, true);
       if (base != null)
         return base;
     }
 
     return null;
+  }
+
+  void checkInvalidOverride(AstNode node, ExecutableElement element, InterfaceType type) {
+    InvalidOverride invalid = findInvalidOverride(element, type);
+    if (invalid != null)
+      log.severe('$invalid', node);
   }
 
   AstNode visitMethodDeclaration(MethodDeclaration node) {
@@ -574,16 +616,25 @@ class ProgramChecker extends RecursiveAstVisitor {
     ClassDeclaration cls = parent as ClassDeclaration;
     // TODO(vsm): Check for generic.
     InterfaceType type = _rules.elementType(cls.element);
-    InvalidOverride invalid = findInvalidOverride(node, type);
-    if (invalid != null) {
-      log.severe('$invalid', node);
-    }
+    checkInvalidOverride(node, node.element, type);
     return node;
   }
 
   AstNode visitFieldDeclaration(FieldDeclaration node) {
-    // FIXME: Is there always a corresponding synthetic method?  If not, we need to validate here.
     node.visitChildren(this);
+    // TODO(vsm): Is there always a corresponding synthetic method?  If not, we need to validate here.
+    final parent = node.parent;
+    if (!node.isStatic && parent is ClassDeclaration) {
+      InterfaceType type = _rules.elementType(parent.element);
+      for (VariableDeclaration decl in node.fields.variables) {
+        final getter = type.getGetter(decl.name.name);
+        if (getter != null)
+          checkInvalidOverride(node, getter, type);
+        final setter = type.getSetter(decl.name.name);
+        if (setter != null)
+          checkInvalidOverride(node, setter, type);
+      }
+    }
     return node;
   }
 
@@ -643,7 +694,7 @@ class ProgramChecker extends RecursiveAstVisitor {
     TypeName type = node.type;
     final dartType = getType(type);
     for (VariableDeclaration variable in node.variables) {
-      // String name = variable.name.name;
+      String name = variable.name.name;
       // print('Found variable $name of type $dartType');
       final initializer = variable.initializer;
       if (initializer != null)
